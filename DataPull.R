@@ -9,3 +9,7 @@ thing <- map_df(us, function(x) {
                                              "B15001_009", "B15001_010"), 
           state = x)
 })
+
+
+#Time Series Play
+
