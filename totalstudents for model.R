@@ -3,18 +3,22 @@
 library(siverse)
 library(tidyverse)
 if(!require(ipeds)) devtools::install_github("jbryer/ipeds")
+install.packages("fUnitRoots")
+install.packages("forecast")
+install.packages("FitAR")
+install.packages("lmtest")
 
 
-efa2008 <- read_csv("~/Google Drive/SI/DataScience/data/gates/IPEDS/API Pulls/data/ef2008a.csv")
-efa2009 <- read_csv("~/Google Drive/SI/DataScience/data/gates/IPEDS/API Pulls/data/ef2009a.csv")
-efa2010 <- read_csv("~/Google Drive/SI/DataScience/data/gates/IPEDS/API Pulls/data/ef2010a.csv")
-efa2011 <- read_csv("~/Google Drive/SI/DataScience/data/gates/IPEDS/API Pulls/data/ef2011a.csv")
-efa2012 <- read_csv("~/Google Drive/SI/DataScience/data/gates/IPEDS/API Pulls/data/ef2012a.csv")
-efa2013 <- read_csv("~/Google Drive/SI/DataScience/data/gates/IPEDS/API Pulls/data/ef2013a.csv")
-efa2014 <- read_csv("~/Google Drive/SI/DataScience/data/gates/IPEDS/API Pulls/data/ef2014a.csv")
-efa2015 <- read_csv("~/Google Drive/SI/DataScience/data/gates/IPEDS/API Pulls/data/ef2015a.csv")
-efa2016 <- read_csv("~/Google Drive/SI/DataScience/data/gates/IPEDS/API Pulls/data/ef2016a.csv")
-efa2017 <- read_csv("~/Google Drive/SI/DataScience/data/gates/IPEDS/API Pulls/data/ef2017a.csv")
+efa2008 <- read_csv("G:/My Drive/SI/DataScience/data/gates/IPEDS/API Pulls/data/ef2008a.csv")
+efa2009 <- read_csv("G:/My Drive/SI/DataScience/data/gates/IPEDS/API Pulls/data/ef2009a.csv")
+efa2010 <- read_csv("G:/My Drive/SI/DataScience/data/gates/IPEDS/API Pulls/data/ef2010a.csv")
+efa2011 <- read_csv("G:/My Drive/SI/DataScience/data/gates/IPEDS/API Pulls/data/ef2011a.csv")
+efa2012 <- read_csv("G:/My Drive/SI/DataScience/data/gates/IPEDS/API Pulls/data/ef2012a.csv")
+efa2013 <- read_csv("G:/My Drive/SI/DataScience/data/gates/IPEDS/API Pulls/data/ef2013a.csv")
+efa2014 <- read_csv("G:/My Drive/SI/DataScience/data/gates/IPEDS/API Pulls/data/ef2014a.csv")
+efa2015 <- read_csv("G:/My Drive/SI/DataScience/data/gates/IPEDS/API Pulls/data/ef2015a.csv")
+efa2016 <- read_csv("G:/My Drive/SI/DataScience/data/gates/IPEDS/API Pulls/data/ef2016a.csv")
+efa2017 <- read_csv("G:/My Drive/SI/DataScience/data/gates/IPEDS/API Pulls/data/ef2017a.csv")
 
 # # this is code Gwen wrote to get the right enrollment
 # efa2016 <- efa2016 %>% 
@@ -68,7 +72,7 @@ efa08to17 <- efa2008 %>%
   
   
 
-institutions <- read_csv("~/Google Drive/SI/DataScience/data/gates/IPEDS/Full Gates Download/IPEDS Data/Institutions.csv") %>% 
+institutions <- read_csv("G:/My Drive/SI/DataScience/data/gates/IPEDS/Full Gates Download/IPEDS Data/Institutions.csv") %>% 
   filter(`Degree Granting` == "Degree-granting") %>% 
   mutate(Level = case_when(Level == "At least 2 but less than 4 years" ~ "2-Yr",
                            Level == "Four or more years" ~ "4-Yr")) %>% 
@@ -82,3 +86,105 @@ states <- institutions %>%
 efastate <- efa08to17 %>% 
   left_join(states)
 
+t <- efastate %>%
+  group_by(State) %>%
+  count(is.na(`County Code`))
+
+
+efastate_stagg <- efastate %>%
+  select(Year, `County Code`, totalstudents) %>% 
+  group_by(Year, `County Code`) %>%
+  mutate(totalstudents_stsum = sum(totalstudents)) %>%
+  select(-c(totalstudents)) %>%
+  unique()
+
+
+#ARIMA Model Test ----
+
+efaMa <- efastate %>%
+  filter(State == "MA") %>%
+  select(Year, totalstudents) %>%
+  group_by(Year) %>% 
+  mutate(TS_sum = sum(totalstudents)) %>%
+  ungroup() %>% 
+  select(-c(totalstudents)) %>% 
+  unique()
+
+efaMa_dupes <- efaMa[rep(row.names(efaMa), 2), 1:2] 
+  
+
+plot(x = efaMass$Year, y = efaMass$TS_sum)
+
+library(stats)
+library(fUnitRoots)
+library(forecast)
+library(FitAR)
+library(lmtest)
+
+#make time series
+ts_efaMass <- stats::ts(efaMass, start = c(2008,1), frequency = 2)
+plot(ts_efaMass)
+
+
+#decompose
+components <- decompose(ts_efaMass)
+plot(components)
+
+
+
+
+
+# Mixed model play ------------------------------------------------------------------------------------------------
+
+# Setup initial data
+
+
+
+df %>%
+    group_by(Year, `State Name`) %>%
+    mutate(sum = sum(totalstudents)) %>%
+    select(Year, `State Name`, sum) %>% 
+    unique() %>%
+    filter(`State Name` == "South Dakota") %>%
+  ggplot(aes(x = Year, y = sum)) + geom_point() + facet_wrap(~`State Name`)
+  
+  #+ facet_wrap(~`State Name`)
+
+test  <- df %>%
+    group_by(Year, `Insitution`) %>% 
+    mutate(pop_change = totalstudents - lag(totalstudents))
+
+
+#######################################################################################
+
+df <- efastate %>%
+  select(Year, State, `State Name`,`County Name`, `County Code`, totalstudents, `Institution Name`) %>%
+  filter(is.na(`County Code`) == FALSE & is.na(totalstudents) == FALSE)
+
+library(lme4)
+library(lmerTest)
+
+hist(log(df$totalstudents))
+
+
+df <- df %>%
+  mutate(log_TS = log(totalstudents))
+
+df.sub <- df %>% 
+  filter(Year < 2013)
+
+
+m0 <- lmer(log_TS ~ poly(Year,3) + (1 | `State Name`), data = df.sub, REML = TRUE)
+
+m1 <- glmer(totalstudents ~ poly(Year,3) + (1 + poly(Year,3)| `State Name`), data = df.sub,
+            family = poisson(link = "log"))
+
+anova(m0,m1)
+
+
+summary(rePCA(m1))
+summary(m1)
+
+base.model <- coef(m1)$`State Name`
+
+save(base.model, file = "base_model.rds")

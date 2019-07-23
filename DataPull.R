@@ -13,3 +13,8 @@ thing <- map_df(us, function(x) {
 
 #Time Series Play
 
+thing <- map_df(us, function(x) {
+  get_acs(geography = "tract", variables = c("B15001_006", "B15001_007", "B15001_008", 
+                                             "B15001_009", "B15001_010"), 
+          state = x)
+})
