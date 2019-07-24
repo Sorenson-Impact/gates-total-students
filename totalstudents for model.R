@@ -188,3 +188,10 @@ summary(m1)
 base.model <- coef(m1)$`State Name`
 
 save(base.model, file = "base_model.rds")
+
+# try and apply the coefficients to the years that were left out, group_by state
+# amount of error in predicted vs observed
+# predicted/observed
+# mean of those predictions
+
+# function to run the polynomial with the coefficients
