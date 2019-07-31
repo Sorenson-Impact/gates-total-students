@@ -355,9 +355,9 @@ summary(rePCA(new.m2.inst_state))
 
 anova(new.m2,new.m2.)
 
-new.m3.inst_state <- glmer(totalstudents ~ poly(Year,3) + FT_c + acceptance_rate + tuition_rev + 
+new.m3.inst_state <- glmer(totalstudents ~ poly(Year,3) + FT_c + 
                              (1 + poly(Year,3) + FT_c | UNITID) + 
-                             (1 + acceptance_rate + tuition_rev |State), 
+                             (1 |State), 
                            data = df,family = poisson(link = "log"), control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5))) 
 
 new.m3 <- glmer(totalstudents ~ poly(Year,3) + FT_c + (1 + poly(Year,3) + FT_c | UNITID) + (1 + poly(Year,2)|State), data = df,
