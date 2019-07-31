@@ -20,6 +20,14 @@ efa2015 <- read_csv("G:/My Drive/SI/DataScience/data/gates/IPEDS/API Pulls/data/
 efa2016 <- read_csv("G:/My Drive/SI/DataScience/data/gates/IPEDS/API Pulls/data/ef2016a.csv")
 efa2017 <- read_csv("G:/My Drive/SI/DataScience/data/gates/IPEDS/API Pulls/data/ef2017a.csv")
 
+
+efb2006.17 <- read_csv("G:/My Drive/SI/DataScience/data/gates/IPEDS/ef2017a.csv")
+efc2006.17 <- read_csv("G:/My Drive/SI/DataScience/data/gates/IPEDS/ef2017a.csv")
+efd2017 <- read_csv("G:/My Drive/SI/DataScience/data/gates/IPEDS/ef2017a.csv")
+efia2017 <- read_csv("G:/My Drive/SI/DataScience/data/gates/IPEDS/ef2017a.csv")
+
+
+
 # # this is code Gwen wrote to get the right enrollment
 # efa2016 <- efa2016 %>% 
 #   filter(LINE==1 | LINE==15 | LINE==29) %>% 
@@ -138,6 +146,13 @@ plot(components)
 
 # Setup initial data
 
+efastate %>% 
+  group_by(`Institution Name`) %>% 
+  count()
+
+df <- efastate %>%
+  select(Year, State, `State Name`,`County Name`, `County Code`, totalstudents, `Institution Name`) %>%
+  filter(is.na(`County Code`) == FALSE & is.na(totalstudents) == FALSE)
 
 
 df %>%
@@ -157,10 +172,11 @@ test  <- df %>%
 
 #######################################################################################
 
-df <- efastate %>%
-  select(Year, State, `State Name`,`County Name`, `County Code`, totalstudents, `Institution Name`) %>%
-  filter(is.na(`County Code`) == FALSE & is.na(totalstudents) == FALSE)
 
+
+remove.packages("lme4")
+
+install.packages("lme4")
 library(lme4)
 library(lmerTest)
 
@@ -171,12 +187,13 @@ df <- df %>%
   mutate(log_TS = log(totalstudents))
 
 df.sub <- df %>% 
-  filter(Year < 2013)
+  filter(Year < 2014)
 
 
+# model using state as a grouping variable
 m0 <- lmer(log_TS ~ poly(Year,3) + (1 | `State Name`), data = df.sub, REML = TRUE)
 
-m1 <- glmer(totalstudents ~ poly(Year,3) + (1 + poly(Year,3)| `State Name`), data = df.sub,
+m1 <- glmer(totalstudents ~ poly(Year,3) + (1 + poly(Year,2)| `State Name`), data = df.sub,
             family = poisson(link = "log"))
 
 anova(m0,m1)
@@ -185,9 +202,37 @@ anova(m0,m1)
 summary(rePCA(m1))
 summary(m1)
 
-base.model <- coef(m1)$`State Name`
+STATE.basemodel <- coef(m1)$`State Name`
 
 save(base.model, file = "base_model.rds")
+
+# model using UNITID as a grouping variable
+
+#checks
+hist(efastate$totalstudents, nclass = 200)
+
+efastate_restricted <- efastate %>% 
+  filter(Year < 2014) %>% 
+  group_by(UNITID) %>% 
+  mutate(cumsum = cumsum(UNITID)/UNITID) %>% 
+  mutate(datacount = max(cumsum)) %>% 
+  filter(datacount > 2)
+
+t <- efastate_restricted %>% 
+  group_by(UNITID) %>% 
+  count() %>% unique()
+
+hist(t$n)
+
+#model
+m2 <- glmer(totalstudents ~ poly(Year,3) + (1 + poly(Year,2)| UNITID), data = efastate_restricted,
+            family = poisson(link = "log"))
+
+summary(rePCA(m2)) #cubic term not helping the model
+plot(m2)
+
+UNITID.basemodel <- coef(m2)$UNITID
+
 
 # try and apply the coefficients to the years that were left out, group_by state
 # amount of error in predicted vs observed
@@ -195,3 +240,82 @@ save(base.model, file = "base_model.rds")
 # mean of those predictions
 
 # function to run the polynomial with the coefficients
+
+
+#Predicted estimates vs. Observed
+
+UNITID.basemodel <- UNITID.basemodel %>% 
+  mutate(UNITID = as.numeric(rownames(.))) %>% 
+  arrange(UNITID)
+
+UNITID.modelmerge <- efastate %>% 
+  select(UNITID, Year, totalstudents) %>% 
+  filter(Year >= 2013) %>% 
+  left_join(UNITID.basemodel) %>% 
+  filter(UNITID == 100654) %>%
+  rename(b0 = 6, 
+         b1 = 7, 
+         b2 = 8, 
+         b3 = 9, 
+         re1 = 4, 
+         re2 = 5) %>% 
+  group_by(UNITID) %>% 
+  mutate(base.ts = totalstudents[1], x = cumsum(UNITID)/UNITID - 1) %>% ungroup() %>% 
+  mutate(predVal = base.ts*exp(b0 + b1*x + b2*x + b3*x + re1*x + re2*x)) %>% 
+  mutate(test = predVal[2]) %>% 
+  mutate(othertest = test*exp(b0 + b1*x + b2*x + b3*x + re1*x + re2*x))
+
+predict(m2)
+
+
+futuredata <- efastate %>%
+  select(UNITID, Year, totalstudents) %>% 
+  filter(Year >= 2014)
+
+
+futuredata$predvals <- exp(predict(m2, newdata = futuredata, allow.new.levels = TRUE))
+
+
+futuredata. <- futuredata %>% 
+  mutate(diff = (predvals - totalstudents), diffratio = predvals/totalstudents) %>% 
+  group_by(UNITID) %>% 
+  mutate(meanrawerror = mean(diff), meanratioerror = mean(diffratio)) %>% 
+  select(UNITID, meanrawerror, meanratioerror, totalstudents) %>% 
+  mutate(sd_ts = sd(totalstudents),
+         sd_ratio = sd_ts/mean(totalstudents),
+         med = median(totalstudents)) %>%
+  unique() %>%
+  #filter(meanratioerror < 1.5 & meanratioerror > 0.5) %>% 
+  ungroup() %>% 
+  select(UNITID, meanratioerror, meanrawerror, sd_ts, sd_ratio) %>% 
+  unique()
+
+futuredata. %>% ggplot(aes(x = sd_ratio, y = meanratioerror)) + geom_point()
+  
+summary(futuredata.$sd_ts)
+summary(futuredata.$sd_ratio)
+hist(futuredata.$meanratioerror)
+
+
+statecount <- futuredata. %>%
+  select(UNITID,State) %>% unique() %>% 
+  group_by(State) %>% 
+  count() %>%
+  ggplot(aes(x = reorder(factor(State),n), y = n)) + geom_bar(stat = "identity")
+
+
+# M3 - include FT student count
+#model
+
+efastate_restricted. <- efastate_restricted %>% 
+  group_by(UNITID) %>% 
+  mutate(FT_mean = mean(FTFT), Year_mean = mean(Year)) %>% 
+  mutate(FT_c = scale(FTFT - FT_mean), Year_c = scale(Year - Year_mean)) %>%
+  filter(FTFT > 0)
+  
+m3 <- glmer(totalstudents ~ poly(Year,3) + FT_c + (1 + poly(Year,2) | UNITID), data = efastate_restricted.,
+            family = poisson(link = "log"), control=glmerControl(optimizer="nloptwrap",optCtrl=list(maxfun=2e5)))
+
+
+
+
