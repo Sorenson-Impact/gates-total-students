@@ -26,6 +26,9 @@ efc2006.17 <- read_csv("G:/My Drive/SI/DataScience/data/gates/IPEDS/ef2017a.csv"
 efd2017 <- read_csv("G:/My Drive/SI/DataScience/data/gates/IPEDS/ef2017a.csv")
 efia2017 <- read_csv("G:/My Drive/SI/DataScience/data/gates/IPEDS/ef2017a.csv")
 
+sensitivity <- read_rds("/Volumes/GoogleDrive/My Drive/SI/DataScience/data/gates/sensitivity/sensitivity.rds")
+sensitivity <- sensitivity %>% select(UNITID = unitid, Level, acceptance_rate, tuition_rev) %>%
+  unique()
 
 
 # # this is code Gwen wrote to get the right enrollment
@@ -225,8 +228,8 @@ t <- efastate_restricted %>%
 hist(t$n)
 
 #model
-m2 <- glmer(totalstudents ~ poly(Year,3) + (1 + poly(Year,2)| UNITID), data = efastate_restricted,
-            family = poisson(link = "log"))
+m2 <- glmer(totalstudents ~ poly(Year,3) + (1 | UNITID), data = efastate_restricted,
+            family = poisson(link = "log"), control=glmerControl(optimizer="",optCtrl=list(maxfun=2e5)))
 
 summary(rePCA(m2)) #cubic term not helping the model
 plot(m2)
@@ -295,6 +298,7 @@ futuredata. %>% ggplot(aes(x = sd_ratio, y = meanratioerror)) + geom_point()
 summary(futuredata.$sd_ts)
 summary(futuredata.$sd_ratio)
 hist(futuredata.$meanratioerror)
+hist(futuredata.$meanrawerror)
 
 
 statecount <- futuredata. %>%
@@ -310,11 +314,54 @@ statecount <- futuredata. %>%
 efastate_restricted. <- efastate_restricted %>% 
   group_by(UNITID) %>% 
   mutate(FT_mean = mean(FTFT), Year_mean = mean(Year)) %>% 
-  mutate(FT_c = scale(FTFT - FT_mean), Year_c = scale(Year - Year_mean)) %>%
+  mutate(FT_c = scale(FTFT - FT_mean), Year_c = scale(Year - Year_mean), TS_s = scale(totalstudents)) %>%
   filter(FTFT > 0)
   
-m3 <- glmer(totalstudents ~ poly(Year,3) + FT_c + (1 + poly(Year,2) | UNITID), data = efastate_restricted.,
-            family = poisson(link = "log"), control=glmerControl(optimizer="nloptwrap",optCtrl=list(maxfun=2e5)))
+m3 <- glmer(totalstudents ~ poly(Year_c,2) + FT_c + (1 + poly(Year_c,1) | UNITID), data = efastate_restricted.,
+            family = poisson(link = "log"), control=glmerControl(optimizer="Nelder_Mead",optCtrl=list(maxfun=4e5)))
+summary(rePCA(m3))
+
+tt <- getME(m3, "theta")
+ll <- getME(m3, "lower")
+min(tt[ll==0])
+
+derivs1 <- m3@optinfo$derivs
+sc_grad1 <- with(derivs1,solve(Hessian,gradient))
+max(abs(sc_grad1))
+
+
+packageVersion("lme4")
+
+
+#New data - only select institutions
+ids <- as.vector(sensitivity[,1])
+
+df <- sensitivity %>%
+  left_join(efastate) %>% 
+  filter(Year < 2014) %>% 
+  group_by(UNITID) %>% 
+  mutate(FT_mean = mean(FTFT), Year_mean = mean(Year)) %>% 
+  mutate(FT_c = scale(FTFT - FT_mean), Year_c = scale(Year - Year_mean), TS_s = scale(totalstudents)) 
+  
+#new baseline model
+new.m2.inst <- glmer(totalstudents ~ poly(Year,3) + (1 + poly(Year,3) | UNITID) , data = df,
+                family = poisson(link = "log"), control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5))) #seems like cubic re is important
+summary(rePCA(new.m2.inst))
+
+
+new.m2.inst_state <- glmer(totalstudents ~ poly(Year,3) + (1 + poly(Year,3) | UNITID) + (1|State), data = df,
+                     family = poisson(link = "log"), control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5))) 
+summary(rePCA(new.m2.inst_state))
+
+anova(new.m2,new.m2.)
+
+new.m3.inst_state <- glmer(totalstudents ~ poly(Year,3) + FT_c + acceptance_rate + tuition_rev + 
+                             (1 + poly(Year,3) + FT_c | UNITID) + 
+                             (1 + acceptance_rate + tuition_rev |State), 
+                           data = df,family = poisson(link = "log"), control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5))) 
+
+new.m3 <- glmer(totalstudents ~ poly(Year,3) + FT_c + (1 + poly(Year,3) + FT_c | UNITID) + (1 + poly(Year,2)|State), data = df,
+                  family = poisson(link = "log"), control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5))) #seems like cubic re is important
 
 
 
