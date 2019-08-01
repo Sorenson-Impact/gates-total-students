@@ -86,4 +86,5 @@ female_employ <- map_df(us, function(x) {
           state = x)
 })
 
-
+write_rds(male_employ, "/Volumes/GoogleDrive/My Drive/SI/DataScience/data/gates/census data/male_employment.rds")
+write_rds(female_employ, "/Volumes/GoogleDrive/My Drive/SI/DataScience/data/gates/census data/female_employment.rds")
