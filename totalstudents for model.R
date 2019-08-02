@@ -430,22 +430,19 @@ ggarrange(baseline.inst_plot14.zoom, baseline.inst_plot14.zout,
                                                                                                "2016", "2016",
                                                                                                "2017", "2017"))
 
-#Errors
+
+
+#BIRTH RATE MODEL----
+birthdata <- read_rds("G:/My Drive/SI/DataScience/data/gates/BirthData/birthdata.rds")
+birthdata <- birthdata %>% 
+  rename(birthcount = n, State = state)%>% 
+  mutate(t18.year = datayear, t19.year = datayear, t20.year = datayear)
+
+
+df.total <- df.total %>% 
+  mutate(t18.year = Year - 18, t19.year = Year - 19, t20.year = Year - 20) %>% 
+  left_join(birthdata)
 
 
 
-#Baseline model evaluations
 
-
-#Saturated Models
-new.m3.inst_state <- glmer(totalstudents ~ poly(Year,3) + FT_c + 
-                             (1 + poly(Year,3) + FT_c | UNITID) + 
-                             (1 |State), 
-                           data = df,family = poisson(link = "log"), control=glmerControl(optCtrl=list(maxfun=3e5))) 
-
-
-
-# run just linear model
-# add birth rate @ t-19 to t-20
-# run with first time students, unemploy rate, birth rates
-# test models against historical mean(mean of previous years students)

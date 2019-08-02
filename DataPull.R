@@ -125,3 +125,36 @@ births93.clean <- births91 %>%
   left_join(fips)
 
 write_rds(births93.clean, "G:/My Drive/SI/DataScience/data/gates/BirthData/births93.rds")
+
+#Load in all data
+births88 <- read_rds("G:/My Drive/SI/DataScience/data/gates/BirthData/births88.rds") 
+births89 <- read_rds("G:/My Drive/SI/DataScience/data/gates/BirthData/births89.rds") 
+births90 <- read_rds("G:/My Drive/SI/DataScience/data/gates/BirthData/births90.rds") 
+births91 <- read_rds("G:/My Drive/SI/DataScience/data/gates/BirthData/births91.rds")
+births92 <- read_rds("G:/My Drive/SI/DataScience/data/gates/BirthData/births92.rds") 
+births93 <- read_rds("G:/My Drive/SI/DataScience/data/gates/BirthData/births93.rds") 
+births94 <- read_rds("G:/My Drive/SI/DataScience/data/gates/BirthData/births94.rds")
+births95 <- read_rds("G:/My Drive/SI/DataScience/data/gates/BirthData/births95.rds") 
+births96 <- read_rds("G:/My Drive/SI/DataScience/data/gates/BirthData/births96.rds") 
+births97 <- read_rds("G:/My Drive/SI/DataScience/data/gates/BirthData/births97.rds") 
+births98 <- read_rds("G:/My Drive/SI/DataScience/data/gates/BirthData/births98.rds") 
+births99 <- read_rds("G:/My Drive/SI/DataScience/data/gates/BirthData/births99.rds") 
+
+birthdata <- births88 %>% 
+  bind_rows(births89) %>% 
+  bind_rows(births90) %>% 
+  bind_rows(births91) %>% 
+  bind_rows(births92) %>% 
+  bind_rows(births93) %>% 
+  bind_rows(births94) %>% 
+  bind_rows(births95) %>% 
+  bind_rows(births96) %>% 
+  bind_rows(births97)  
+
+write_rds(birthdata, "G:/My Drive/SI/DataScience/data/gates/BirthData/birthdata.rds")
+
+  
+
+  
+
+
