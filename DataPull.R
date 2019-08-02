@@ -29,7 +29,7 @@ readRenviron("~/.Renviron")
 
 us <- unique(fips_codes$state)[1:51]
 
-acsvars <- load_variables(2011, "acs5", cache = T) %>%
+acsvars <- load_variables(year = 2012, "acs5", cache = T) %>%
   mutate(level = str_count(label, pattern = "!!")) %>%
   rowwise() %>%
   mutate(levlab = str_split(label, pattern = "!!") %>% unlist() %>% .[level + 1]) %>%
@@ -67,13 +67,16 @@ employment_test_2009 <- future_map_dfr(us, function(x){
   si_acs("B23001", year = 2009, geography = "state", state = x)
 }, .progress = T)
 
-employment_test_2011 <- future_map_dfr(us, function(x){
-  si_acs("B23001", year = 2011, geography = "state", state = x)
+employment_test_2010 <- future_map_dfr(us, function(x){
+  si_acs("B23001", year = 2010, geography = "state", state = x)
 }, .progress = T)
 
-si_acs("B23001", year = 2011, geography = "state", state = "AL")
 
-employment_spread <- employment_test_2009 %>% 
+employment_test_2012 <- future_map_dfr(us, function(x){
+  si_acs("B23001", year = 2012, geography = "state", state = x)
+}, .progress = T)
+
+employment_spread <- employment_test_2010 %>% 
   select(c(county, estimate, label)) %>% 
   spread(key = label, value = estimate) %>% 
   mutate(employed = reduce(select(., ends_with("Employed")), `+`),
@@ -81,6 +84,77 @@ employment_spread <- employment_test_2009 %>%
          total = employed + unemployed,
          unemployment_rate = unemployed/total)
 
-write_rds(employment_spread, "/Volumes/GoogleDrive/My Drive/SI/DataScience/data/gates/census data/employment_data_2009.rds")
+write_rds(employment_spread, "G:/My Drive/SI/DataScience/data/gates/census data/employment_data2010.rds")
 
-read_csv("/Users/lilsoc523/Downloads/natl1990.csv")
+
+#Birth Data Cleaning-----
+fips <- fips_codes %>% 
+  select(state, state_code) %>% 
+  unique()
+
+?fips_codes
+#1991
+births91 <- read_csv("G:/My Drive/SI/DataScience/data/gates/BirthData/natl1991.csv")
+
+births91.clean <- births91 %>% 
+  select(datayear, state_code = stoccfip) %>% 
+  group_by(state_code) %>% 
+  count() %>% mutate(datayear = 1991) %>% 
+  left_join(fips)
+
+write_rds(births91.clean, "G:/My Drive/SI/DataScience/data/gates/BirthData/births91.rds")
+
+#1992
+births92 <- read_csv("G:/My Drive/SI/DataScience/data/gates/BirthData/natl1992.csv")
+
+births92.clean <- births92 %>% 
+  select(datayear, state_code = stoccfip) %>% 
+  group_by(state_code) %>% 
+  count() %>% mutate(datayear = 1992) %>% 
+  left_join(fips)
+
+write_rds(births92.clean, "G:/My Drive/SI/DataScience/data/gates/BirthData/births92.rds")
+
+#1993
+births93 <- read_csv("G:/My Drive/SI/DataScience/data/gates/BirthData/natl1993 2.csv")
+
+births93.clean <- births91 %>% 
+  select(datayear, state_code = stoccfip) %>% 
+  group_by(state_code) %>% 
+  count() %>% mutate(datayear = 1993) %>% 
+  left_join(fips)
+
+write_rds(births93.clean, "G:/My Drive/SI/DataScience/data/gates/BirthData/births93.rds")
+
+#Load in all data
+births88 <- read_rds("G:/My Drive/SI/DataScience/data/gates/BirthData/births88.rds") 
+births89 <- read_rds("G:/My Drive/SI/DataScience/data/gates/BirthData/births89.rds") 
+births90 <- read_rds("G:/My Drive/SI/DataScience/data/gates/BirthData/births90.rds") 
+births91 <- read_rds("G:/My Drive/SI/DataScience/data/gates/BirthData/births91.rds")
+births92 <- read_rds("G:/My Drive/SI/DataScience/data/gates/BirthData/births92.rds") 
+births93 <- read_rds("G:/My Drive/SI/DataScience/data/gates/BirthData/births93.rds") 
+births94 <- read_rds("G:/My Drive/SI/DataScience/data/gates/BirthData/births94.rds")
+births95 <- read_rds("G:/My Drive/SI/DataScience/data/gates/BirthData/births95.rds") 
+births96 <- read_rds("G:/My Drive/SI/DataScience/data/gates/BirthData/births96.rds") 
+births97 <- read_rds("G:/My Drive/SI/DataScience/data/gates/BirthData/births97.rds") 
+births98 <- read_rds("G:/My Drive/SI/DataScience/data/gates/BirthData/births98.rds") 
+births99 <- read_rds("G:/My Drive/SI/DataScience/data/gates/BirthData/births99.rds") 
+
+birthdata <- births88 %>% 
+  bind_rows(births89) %>% 
+  bind_rows(births90) %>% 
+  bind_rows(births91) %>% 
+  bind_rows(births92) %>% 
+  bind_rows(births93) %>% 
+  bind_rows(births94) %>% 
+  bind_rows(births95) %>% 
+  bind_rows(births96) %>% 
+  bind_rows(births97)  
+
+write_rds(birthdata, "G:/My Drive/SI/DataScience/data/gates/BirthData/birthdata.rds")
+
+  
+
+  
+
+

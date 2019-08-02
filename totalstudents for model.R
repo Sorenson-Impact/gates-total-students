@@ -80,8 +80,8 @@ efa08to17 <- efa2008 %>%
   bind_rows(efa2015) %>% 
   bind_rows(efa2016) %>% 
   bind_rows(efa2017) 
-  
-  
+
+
 
 institutions <- read_csv("G:/My Drive/SI/DataScience/data/gates/IPEDS/Full Gates Download/IPEDS Data/Institutions.csv") %>% 
   filter(`Degree Granting` == "Degree-granting") %>% 
@@ -122,7 +122,7 @@ efaMa <- efastate %>%
   unique()
 
 efaMa_dupes <- efaMa[rep(row.names(efaMa), 2), 1:2] 
-  
+
 
 plot(x = efaMass$Year, y = efaMass$TS_sum)
 
@@ -159,18 +159,18 @@ df <- efastate %>%
 
 
 df %>%
-    group_by(Year, `State Name`) %>%
-    mutate(sum = sum(totalstudents)) %>%
-    select(Year, `State Name`, sum) %>% 
-    unique() %>%
-    filter(`State Name` == "South Dakota") %>%
+  group_by(Year, `State Name`) %>%
+  mutate(sum = sum(totalstudents)) %>%
+  select(Year, `State Name`, sum) %>% 
+  unique() %>%
+  filter(`State Name` == "South Dakota") %>%
   ggplot(aes(x = Year, y = sum)) + geom_point() + facet_wrap(~`State Name`)
-  
-  #+ facet_wrap(~`State Name`)
+
+#+ facet_wrap(~`State Name`)
 
 test  <- df %>%
-    group_by(Year, `Insitution`) %>% 
-    mutate(pop_change = totalstudents - lag(totalstudents))
+  group_by(Year, `Insitution`) %>% 
+  mutate(pop_change = totalstudents - lag(totalstudents))
 
 
 #######################################################################################
@@ -294,7 +294,7 @@ futuredata. <- futuredata %>%
   unique()
 
 futuredata. %>% ggplot(aes(x = sd_ratio, y = meanratioerror)) + geom_point()
-  
+
 summary(futuredata.$sd_ts)
 summary(futuredata.$sd_ratio)
 hist(futuredata.$meanratioerror)
@@ -316,7 +316,7 @@ efastate_restricted. <- efastate_restricted %>%
   mutate(FT_mean = mean(FTFT), Year_mean = mean(Year)) %>% 
   mutate(FT_c = scale(FTFT - FT_mean), Year_c = scale(Year - Year_mean), TS_s = scale(totalstudents)) %>%
   filter(FTFT > 0)
-  
+
 m3 <- glmer(totalstudents ~ poly(Year_c,2) + FT_c + (1 + poly(Year_c,1) | UNITID), data = efastate_restricted.,
             family = poisson(link = "log"), control=glmerControl(optimizer="Nelder_Mead",optCtrl=list(maxfun=4e5)))
 summary(rePCA(m3))
@@ -339,10 +339,10 @@ df.total <- sensitivity %>%
   group_by(UNITID) %>% 
   mutate(count = max(cumsum(UNITID)/UNITID)) %>% ungroup()
 
-  hist(df.total$count)
-  df.total %>% mutate(group = ifelse(count < 10, "Less Than Full Data", "Full Data")) %>% 
-    group_by(group) %>% 
-    count()
+hist(df.total$count)
+df.total %>% mutate(group = ifelse(count < 10, "Less Than Full Data", "Full Data")) %>% 
+  group_by(group) %>% 
+  count()
 
 df.model <- df.total %>% 
   filter(Year < 2014 & count == 10) %>% 
@@ -350,102 +350,107 @@ df.model <- df.total %>%
   mutate(FT_mean = mean(FTFT), Year_mean = mean(Year)) %>% 
   mutate(FT_c = scale(FTFT - FT_mean), Year_c = scale(Year - Year_mean), TS_log = log(totalstudents)) 
 
-  df.model %>% 
-    select(UNITID) %>% ungroup() %>% 
-    unique() %>% count() %>% mutate(total = sum(n))
+df.model %>% 
+  select(UNITID) %>% ungroup() %>% 
+  unique() %>% count() %>% mutate(total = sum(n))
 
 df.future <- df.total %>% 
   filter(Year >= 2014 & count == 10) %>% 
   select(UNITID, Year, State, totalstudents)
-  
+
 #BASELINE MODELS-------
 library(lme4)
 #Only by institution
-                              #poly() function does not create true polynomials of values.  Rather, it creates orthogonal polynomials which mimic the true curvature
-                              #of the values passed through poly(), but with the added advantage that the values are not correlated.  Orthogonal poly's preferred b/c they 
-                              #are not as highly correlated and thus reduce multicollinearity.
+#poly() function does not create true polynomials of values.  Rather, it creates orthogonal polynomials which mimic the true curvature
+#of the values passed through poly(), but with the added advantage that the values are not correlated.  Orthogonal poly's preferred b/c they 
+#are not as highly correlated and thus reduce multicollinearity.
 
-    #Linear model 
-    m.inst_lin <- glmer(totalstudents ~ poly(Year,1) + (1 + poly(Year,1) | UNITID), 
+#Linear model 
+m.inst_lin <- glmer(totalstudents ~ poly(Year,1) + (1 + poly(Year,1) | UNITID), 
+                    family = poisson(link = "log"), 
+                    control=glmerControl(optCtrl=list(maxfun=3e5)),
+                    data = df.model)
+
+#Quadratic model
+m.inst_quad <- glmer(totalstudents ~ poly(Year,2) + (1 + poly(Year,2) | UNITID), 
                      family = poisson(link = "log"), 
                      control=glmerControl(optCtrl=list(maxfun=3e5)),
                      data = df.model)
 
-    #Quadratic model
-    m.inst_quad <- glmer(totalstudents ~ poly(Year,2) + (1 + poly(Year,2) | UNITID), 
-                       family = poisson(link = "log"), 
-                       control=glmerControl(optCtrl=list(maxfun=3e5)),
-                       data = df.model)
+#Polynomial(cubic) model 
+m.inst_poly <- glmer(totalstudents ~ poly(Year,3) + (1 + poly(Year,3) | UNITID), 
+                     data = df.model,
+                     family = poisson(link = "log"), 
+                     control=glmerControl(optCtrl=list(maxfun=3e5))) #seems like cubic re is important
+print(m.inst_poly)
 
-    #Polynomial(cubic) model 
-    m.inst_poly <- glmer(totalstudents ~ poly(Year,3) + (1 + poly(Year,3) | UNITID), 
-                    data = df.model,
-                    family = poisson(link = "log"), 
-                    control=glmerControl(optCtrl=list(maxfun=3e5))) #seems like cubic re is important
-    print(m.inst_poly)
-    
-    #Model Comparisons
-    anova(m.inst_lin, m.inst_quad, m.inst_poly)
-        #Cubic model comes out as a fairly clear winner.  Drastic reductions in AIC, BIC, and loglik(though I beleive AIC and BIC in this case are more appropriate indices)
-        summary(rePCA(m.inst_poly))
-        summary(m.inst_poly)
-        #Save out cubic model
-        save(m.inst_poly, file = "C:\\Users\\grant\\Desktop\\School\\Sorenson\\GitHub\\gates-total-students\\baseline_poly_inst.rda")
+#Model Comparisons
+anova(m.inst_lin, m.inst_quad, m.inst_poly)
+#Cubic model comes out as a fairly clear winner.  Drastic reductions in AIC, BIC, and loglik(though I beleive AIC and BIC in this case are more appropriate indices)
+summary(rePCA(m.inst_poly))
+summary(m.inst_poly)
+#Save out cubic model
+save(m.inst_poly, file = "C:\\Users\\grant\\Desktop\\School\\Sorenson\\GitHub\\gates-total-students\\baseline_poly_inst.rda")
 
-  #Get predicted values from model
-  baseline.inst_poly <- df.future %>% 
-    select(UNITID, Year, State, totalstudents) %>% 
-    mutate(predvals = exp(predict(m.inst_poly, newdata = df.future, allow.new.levels = TRUE, re.form = ~(1 + poly(Year,3) | UNITID)))) %>% 
-    mutate(error = predvals - totalstudents) 
-      
-  #Plot predicted vs. actual
-    baseline.inst_plot17.zoom <- baseline.inst_poly %>%
-      filter(Year == 2017) %>% 
-    ggplot(aes(x = predvals, y = totalstudents)) + geom_point() + geom_abline(intercept = 0, slope = 1) + 
-    ggtitle("Predicted Vs. Observed: Baseline Model - Inst, Poly3 Year RE") +
-      scale_x_continuous(breaks = seq(0,10000, 1000), limits = c(0,10000)) +
-      scale_y_continuous(breaks = seq(0,10000, 1000), limits = c(0,10000)) 
-      #facet_wrap(~Year)
-    
-    baseline.inst_plot14.zout <- baseline.inst_poly %>%
-      filter(Year == 2014) %>% 
-      ggplot(aes(x = predvals, y = totalstudents)) + geom_point() + geom_abline(intercept = 0, slope = 1) + 
-      ggtitle("Predicted Vs. Observed: Baseline Model - Inst, Poly3 Year RE") +
-      scale_x_continuous(breaks = seq(0,1000000, 100000), limits = c(0,1000000)) +
-      scale_y_continuous(breaks = seq(0,1000000, 100000), limits = c(0,1000000)) 
-      #facet_wrap(~Year)
-    
-  #Wrapped plots by year
-  baseline.inst_plot1
-  baseline.inst_plot2
+#Get predicted values from model
+baseline.inst_poly <- df.future %>% 
+  select(UNITID, Year, State, totalstudents) %>% 
+  mutate(predvals = exp(predict(m.inst_poly, newdata = df.future, allow.new.levels = TRUE, re.form = ~(1 + poly(Year,3) | UNITID)))) %>% 
+  mutate(error = predvals - totalstudents) 
+
+#Plot predicted vs. actual
+baseline.inst_plot17.zoom <- baseline.inst_poly %>%
+  filter(Year == 2017) %>% 
+  ggplot(aes(x = predvals, y = totalstudents)) + geom_point() + geom_abline(intercept = 0, slope = 1) + 
+  ggtitle("Predicted Vs. Observed: Baseline Model - Inst, Poly3 Year RE") +
+  scale_x_continuous(breaks = seq(0,10000, 1000), limits = c(0,10000)) +
+  scale_y_continuous(breaks = seq(0,10000, 1000), limits = c(0,10000)) 
+#facet_wrap(~Year)
+
+baseline.inst_plot14.zout <- baseline.inst_poly %>%
+  filter(Year == 2014) %>% 
+  ggplot(aes(x = predvals, y = totalstudents)) + geom_point() + geom_abline(intercept = 0, slope = 1) + 
+  ggtitle("Predicted Vs. Observed: Baseline Model - Inst, Poly3 Year RE") +
+  scale_x_continuous(breaks = seq(0,1000000, 100000), limits = c(0,1000000)) +
+  scale_y_continuous(breaks = seq(0,1000000, 100000), limits = c(0,1000000)) 
+#facet_wrap(~Year)
+
+#Wrapped plots by year
+baseline.inst_plot1
+baseline.inst_plot2
 
 
-  #Combined plots of zoomed in and out
-  library(ggpubr)
-  ggarrange(baseline.inst_plot14.zoom, baseline.inst_plot14.zout, 
-            baseline.inst_plot15.zoom, baseline.inst_plot15.zout,
-            baseline.inst_plot16.zoom, baseline.inst_plot16.zout,
-            baseline.inst_plot17.zoom, baseline.inst_plot17.zout, nrow = 4, ncol = 2, labels = c("2014", "2014",
-                                                                                                 "2015", "2015",
-                                                                                                 "2016", "2016",
-                                                                                                 "2017", "2017"))
-  
-  #Errors
-  
-  
-
-#Baseline model evaluations
-
-
-#Saturated Models
-new.m3.inst_state <- glmer(totalstudents ~ poly(Year,3) + FT_c + 
-                             (1 + poly(Year,3) + FT_c | UNITID) + 
-                             (1 |State), 
-                           data = df,family = poisson(link = "log"), control=glmerControl(optCtrl=list(maxfun=3e5))) 
+#Combined plots of zoomed in and out
+library(ggpubr)
+ggarrange(baseline.inst_plot14.zoom, baseline.inst_plot14.zout, 
+          baseline.inst_plot15.zoom, baseline.inst_plot15.zout,
+          baseline.inst_plot16.zoom, baseline.inst_plot16.zout,
+          baseline.inst_plot17.zoom, baseline.inst_plot17.zout, nrow = 4, ncol = 2, labels = c("2014", "2014",
+                                                                                               "2015", "2015",
+                                                                                               "2016", "2016",
+                                                                                               "2017", "2017"))
 
 
 
-# run just linear model
-# add birth rate @ t-19 to t-20
-# run with first time students, unemploy rate, birth rates
-# test models against historical mean(mean of previous years students)
+#BIRTH RATE MODEL----
+birthdata <- read_rds("G:/My Drive/SI/DataScience/data/gates/BirthData/birthdata.rds")
+birthdata <- birthdata %>% 
+  rename(birthcount = n, State = state)%>% 
+  select(birthcount, State, datayear)
+ # mutate(t18.year = datayear, t19.year = datayear, t20.year = datayear)
+
+
+df.total <- df.total %>% 
+  mutate(datayear = Year -18) %>% 
+  left_join(birthdata) %>% 
+  rename(t18 = birthcount) %>% 
+  mutate(datayear = Year - 19) %>% 
+  left_join(birthdata) %>% 
+  rename(t19 = birthcount) %>% 
+  mutate(datayear = Year - 20) %>% 
+  left_join(birthdata) %>% 
+  rename(t20 = birthcount)
+
+
+
+
