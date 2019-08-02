@@ -87,6 +87,30 @@ write_rds(births88, "/Volumes/GoogleDrive/My Drive/SI/DataScience/data/gates/Bir
 write_rds(births89, "/Volumes/GoogleDrive/My Drive/SI/DataScience/data/gates/BirthData/births89.rds")
 write_rds(births90, "/Volumes/GoogleDrive/My Drive/SI/DataScience/data/gates/BirthData/births90.rds")
 
+births88 <- read_rds("/Volumes/GoogleDrive/My Drive/SI/DataScience/data/gates/BirthData/births88.rds")
+births89 <- read_rds("/Volumes/GoogleDrive/My Drive/SI/DataScience/data/gates/BirthData/births89.rds")
+births90 <- read_rds("/Volumes/GoogleDrive/My Drive/SI/DataScience/data/gates/BirthData/births90.rds")
+
 rm(natl1988)
 rm(natl1989)
 rm(natl1990)
+
+births88 <- births88 %>% 
+  rename(births_1988 = n) %>% 
+  select(-c(datayear))
+births89 <- births89 %>% 
+  rename(births_1989 = n) %>% 
+  select(-c(datayear))
+births90 <- births90 %>% 
+  rename(births_1990 = n) %>% 
+  select(-c(datayear))
+
+birthdata <- bind_rows(births88, births89, births90)
+
+birthdata <- birthdata %>% 
+  mutate(t18 = datayear + 18,
+         t19 = datayear+19,
+         t20 = datayear+20)
+
+t <- left_join(births88, births89, by = c("state", "state_code")) %>%
+  left_join(births90)
