@@ -436,12 +436,20 @@ ggarrange(baseline.inst_plot14.zoom, baseline.inst_plot14.zout,
 birthdata <- read_rds("G:/My Drive/SI/DataScience/data/gates/BirthData/birthdata.rds")
 birthdata <- birthdata %>% 
   rename(birthcount = n, State = state)%>% 
-  mutate(t18.year = datayear, t19.year = datayear, t20.year = datayear)
+  select(birthcount, State, datayear)
+ # mutate(t18.year = datayear, t19.year = datayear, t20.year = datayear)
 
 
 df.total <- df.total %>% 
-  mutate(t18.year = Year - 18, t19.year = Year - 19, t20.year = Year - 20) %>% 
-  left_join(birthdata)
+  mutate(datayear = Year -18) %>% 
+  left_join(birthdata) %>% 
+  rename(t18 = birthcount) %>% 
+  mutate(datayear = Year - 19) %>% 
+  left_join(birthdata) %>% 
+  rename(t19 = birthcount) %>% 
+  mutate(datayear = Year - 20) %>% 
+  left_join(birthdata) %>% 
+  rename(t20 = birthcount)
 
 
 
