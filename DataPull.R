@@ -6,85 +6,81 @@ library(fuzzyjoin)
 library(purrr)
 library(furrr)
 
-census_api_key("e3a7c1da5af60c9c770f4e9ab62807e6cef7683a", install = TRUE)
+# institutions file from gates foundation
+# random forrest
+# highlight by variability
+# try a linear model
+# slope from the years in the past
+# color continuously by average total students data per institute
+# correlate birth rate by state, see if it is correlated with student populations
+# use grawe ELS data ?
+# compare model to:
+# - linear model (log data)
+# - time series with random walks
+
+# census_api_key("e3a7c1da5af60c9c770f4e9ab62807e6cef7683a", install = TRUE)
 readRenviron("~/.Renviron")
 
-vthing <- map_df(us, function(x) {
-  get_acs(geography = "tract", variables = c("B15001_006", "B15001_007", "B15001_008", 
-                                             "B15001_009", "B15001_010"), 
-          state = x)
-})
-
-
-#Time Series Play
-
-
-
-vars <- load_variables(2009, "acs5", cache = TRUE)
+# vthing <- map_df(us, function(x) {
+#   get_acs(geography = "tract", variables = c("B15001_006", "B15001_007", "B15001_008", 
+#                                              "B15001_009", "B15001_010"), 
+#           state = x)
+# })
 
 us <- unique(fips_codes$state)[1:51]
 
-thing <- map_df(us, function(x) {
-  get_acs(geography = "state", variables = c("B23001_062"), 
-          state = x)
-})
+acsvars <- load_variables(2011, "acs5", cache = T) %>%
+  mutate(level = str_count(label, pattern = "!!")) %>%
+  rowwise() %>%
+  mutate(levlab = str_split(label, pattern = "!!") %>% unlist() %>% .[level + 1]) %>%
+  ungroup() %>%
+  mutate(concept = str_to_title(concept)) %>%
+  rename(variable = name)
 
-test <- c()
-for (i in 0:9){
-  for (j in 0:2){
-    if (i == 0){
-      test <- c(test, paste("00",as.character(6+7*i+j), sep= ""))
-    } else {
-      test <- c(test, paste("0",as.character(6+7*i+j), sep= ""))
-    }
-  }
+si_acs <- function(table, county = NULL, state = NULL, summary_var = "universe total", geography = NULL, survey = "acs5", geometry = FALSE, year = 2017) {
+  # cat(yellow(bold("Reminder: You must stay within the same level for any summary to be valid!\n")))
+  
+  if(summary_var == "universe total") summary_var = paste0(table, "_001")
+  summary_label = acsvars %>% filter(variable == summary_var) %>% pull(levlab)
+  
+  get_acs(geography = geography,
+          table = table,
+          county = county,
+          state = state,
+          output = "tidy",
+          year = year,
+          cache_table = T,
+          summary_var = summary_var, 
+          geometry = geometry, 
+          cb = T, 
+          survey = survey) %>%
+    clean_names() %>%
+    left_join(acsvars) %>%
+    select(-summary_moe, -variable) %>%
+    select(geoid, county = name, level, levlab, estimate, everything()) %>%
+    rename(!!summary_label := summary_est)
 }
-for (i in 1:3){
-  for (j in 0:2){
-    test <- c(test, paste("0",as.character(69+5*i+j), sep= ""))
-  }
-}
-test
 
-test2 <- c()
-for (i in 0:9){
-  for (j in 0:2){
-    temp <- as.character(92+7*i+j)
-    if (str_length(temp)<3){
-      test2 <- c(test2, paste("0", temp, sep= ""))
-    } else {
-      test2 <- c(test2, temp)
-    }
-  }
-}
-for (i in 1:3){
-  for (j in 0:2){
-    test2 <- c(test2, as.character(155+5*i+j))
-  }
-}
-test2
+plan(multisession)
 
-relevant_cols <- c()
-for (i in 1:length(test)){
-  relevant_cols <- c(relevant_cols, paste("B23001_", test[i], sep = ""))
-}
-relevant_cols
+employment_test_2009 <- future_map_dfr(us, function(x){
+  si_acs("B23001", year = 2009, geography = "state", state = x)
+}, .progress = T)
 
-relevant_cols2 <- c()
-for (i in 1:length(test2)){
-  relevant_cols2 <- c(relevant_cols2, paste("B23001_", test2[i], sep = ""))
-}
-relevant_cols2
+employment_test_2011 <- future_map_dfr(us, function(x){
+  si_acs("B23001", year = 2011, geography = "state", state = x)
+}, .progress = T)
 
-male_employ <- map_df(us, function(x) {
-  get_acs(geography = "state", variables = relevant_cols, 
-          state = x)
-})
+si_acs("B23001", year = 2011, geography = "state", state = "AL")
 
-female_employ <- map_df(us, function(x) {
-  get_acs(geography = "state", variables = relevant_cols2, 
-          state = x)
-})
+employment_spread <- employment_test_2009 %>% 
+  select(c(county, estimate, label)) %>% 
+  spread(key = label, value = estimate) %>% 
+  mutate(employed = reduce(select(., ends_with("Employed")), `+`),
+         unemployed = reduce(select(., ends_with("Unemployed")), `+`),
+         total = employed + unemployed,
+         unemployment_rate = unemployed/total)
 
-write_rds(male_employ, "/Volumes/GoogleDrive/My Drive/SI/DataScience/data/gates/census data/male_employment.rds")
-write_rds(female_employ, "/Volumes/GoogleDrive/My Drive/SI/DataScience/data/gates/census data/female_employment.rds")
+write_rds(employment_spread, "/Volumes/GoogleDrive/My Drive/SI/DataScience/data/gates/census data/employment_data_2009.rds")
+
+read_csv("/Users/lilsoc523/Downloads/natl1990.csv")
