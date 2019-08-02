@@ -348,9 +348,23 @@ new.m2.inst <- glmer(totalstudents ~ poly(Year,3) + (1 + poly(Year,3) | UNITID) 
                 family = poisson(link = "log"), control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5))) #seems like cubic re is important
 summary(rePCA(new.m2.inst))
 
+save(new.m2.inst, file = "~/gates-total-students/m2_inst.rda")
 
-new.m2.inst_state <- glmer(totalstudents ~ poly(Year,3) + (1 + poly(Year,3) | UNITID) + (1|State), data = df,
-                     family = poisson(link = "log"), control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5))) 
+new.m2.state <- glmer(totalstudents ~ poly(Year,3) + (1 + poly(Year,3)|State), data = df,
+                           family = poisson(link = "log"), control=glmerControl(optCtrl=list(maxfun=3e5))) 
+summary(rePCA(new.m2.state))
+
+anova(new.m2.state, new.m2.state.) #better model fit with cubic re, possibly not by a huge amount, however.
+
+save(new.m2.state, file = "~/gates-total-students/m2_state.rda")
+
+new.m2.inst_state. <- glmer(totalstudents ~ poly(Year,3) + (1 + poly(Year,3) | UNITID) + (1 | State), 
+                           data = df,family = poisson(link = "log"), control=glmerControl(optCtrl=list(maxfun=3e5))) 
+
+anova(new.m2.inst_state, new.m2.inst_state.) #better fit without re of year at state level
+
+save(new.m2.inst_state, file = "~/gates-total-students/m2_inst_state.rda")
+
 summary(rePCA(new.m2.inst_state))
 
 anova(new.m2,new.m2.)
