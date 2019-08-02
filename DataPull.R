@@ -107,7 +107,7 @@ write_rds(births91.clean, "G:/My Drive/SI/DataScience/data/gates/BirthData/birth
 #1992
 births92 <- read_csv("G:/My Drive/SI/DataScience/data/gates/BirthData/natl1992.csv")
 
-births92.clean <- births91 %>% 
+births92.clean <- births92 %>% 
   select(datayear, state_code = stoccfip) %>% 
   group_by(state_code) %>% 
   count() %>% mutate(datayear = 1992) %>% 
