@@ -29,7 +29,7 @@ readRenviron("~/.Renviron")
 
 us <- unique(fips_codes$state)[1:51]
 
-acsvars <- load_variables(year = 2009, "acs5", cache = T) %>%
+acsvars <- load_variables(2011, "acs5", cache = T) %>%
   mutate(level = str_count(label, pattern = "!!")) %>%
   rowwise() %>%
   mutate(levlab = str_split(label, pattern = "!!") %>% unlist() %>% .[level + 1]) %>%
@@ -67,6 +67,12 @@ employment_test_2009 <- future_map_dfr(us, function(x){
   si_acs("B23001", year = 2009, geography = "state", state = x)
 }, .progress = T)
 
+employment_test_2011 <- future_map_dfr(us, function(x){
+  si_acs("B23001", year = 2011, geography = "state", state = x)
+}, .progress = T)
+
+si_acs("B23001", year = 2011, geography = "state", state = "AL")
+
 employment_spread <- employment_test_2009 %>% 
   select(c(county, estimate, label)) %>% 
   spread(key = label, value = estimate) %>% 
@@ -75,6 +81,6 @@ employment_spread <- employment_test_2009 %>%
          total = employed + unemployed,
          unemployment_rate = unemployed/total)
 
-write_rds(employment_spread, "/Volumes/GoogleDrive/My Drive/SI/DataScience/data/gates/census data/employment_data.rds")
+write_rds(employment_spread, "/Volumes/GoogleDrive/My Drive/SI/DataScience/data/gates/census data/employment_data_2009.rds")
 
 read_csv("/Users/lilsoc523/Downloads/natl1990.csv")
