@@ -433,26 +433,120 @@ ggarrange(baseline.inst_plot14.zoom, baseline.inst_plot14.zout,
 
 
 #BIRTH RATE MODEL----
-birthdata <- read_rds("G:/My Drive/SI/DataScience/data/gates/BirthData/birthdata.rds")
+birthdata <- read_rds("G:/My Drive/SI/DataScience/data/gates/BirthData/birthdata_for_model.rds")
 birthdata <- birthdata %>% 
-  rename(birthcount = n, State = state)%>% 
-  select(birthcount, State, datayear)
+  rename(Year = realyear, State = state)
  # mutate(t18.year = datayear, t19.year = datayear, t20.year = datayear)
 
-df.total <- df.total %>% 
-  mutate(datayear = Year -18) %>% 
-  left_join(birthdata) %>% 
-  rename(t18 = birthcount) %>% 
-  mutate(datayear = Year - 19) %>% 
-  left_join(birthdata) %>% 
-  rename(t19 = birthcount) %>% 
-  mutate(datayear = Year - 20) %>% 
-  left_join(birthdata) %>% 
-  rename(t20 = birthcount)
+institutions <- read_csv("G:/My Drive/SI/DataScience/data/gates/IPEDS/Full Gates Download/IPEDS Data/Institutions.csv")
+institutions <- institutions %>% 
+  select(UNITID = `Institution ID`, State) %>% 
+  unique()
 
-  #Model
-   <- glmer(totalstudents ~ poly(Year,3) + (1 + poly(Year,3) | UNITID) + (1 | State), 
+df.total. <- df.total %>% 
+  left_join(institutions) %>% 
+  left_join(birthdata) 
+
+
+
+#Write out full data set with birth rate
+write_rds(df.total.,"G:/My Drive/SI/DataScience/data/gates/BirthData/BirthrateModelData.rds")
+
+BirthRateModel.df <- read_rds("G:/My Drive/SI/DataScience/data/gates/BirthData/BirthrateModelData.rds")
+
+df.model <- BirthRateModel.df %>%
+  filter(Year < 2014 & is.na(State) == FALSE) %>% ungroup() %>% 
+  mutate(count_t18_gc = scale(count_t18 - mean(count_t18)), 
+         count_t19_gc = scale(count_t19 - mean(count_t19)),
+         count_t20_gc = scale(count_t20 - mean(count_t20)))
+
+
+  #Birthrate Model -- institution level
+  m.birthrate <- glmer(totalstudents ~ poly(Year,3) + count_t18_gc + 
+                         (1 + poly(Year,3) | UNITID) + 
+                         (1 + count_t18_gc | State), 
                        data = df.model,
                        family = poisson(link = "log"), 
                        control=glmerControl(optCtrl=list(maxfun=3e5))) 
+  
+  summary(rePCA(m.birthrate))
+  summary(m.birthrate)
+  
+  test <- df.model %>% 
+    select(State, Year, totalstudents, count_t18,count_t19,count_t20) %>% 
+    group_by(State, Year) %>% 
+    mutate(TS_State = sum(totalstudents)) %>% 
+    select(TS_State, Year, count_t18, count_t19,count_t20) %>% ungroup() %>%  
+    unique()
+  
+  cor.test(test$count_t18, test$TS_State)
+  plot(test$count_t18, test$TS_State)
+  
+  # Model -- state level
+  df.birth_st <- df.model %>% 
+    select(State, totalstudents, Year, count_t18, count_t19, count_t20) %>% 
+    group_by(State, Year) %>% 
+    mutate(TS_st = sum(totalstudents)) %>% ungroup() %>% 
+    select(-c(totalstudents)) %>% 
+    unique() %>% 
+    mutate(count_t18_gc = scale(count_t18 - mean(count_t18)))
+           
+           
+  hist(df.birth_st$TS_st)
+  
+    #Full model
+    m.birthrate_st <- glmer(TS_st ~ poly(Year,3) + count_t18_gc + 
+                           (1 + poly(Year,3) + count_t18_gc | State), 
+                         data = df.birth_st,
+                         family = poisson(link = "log"), 
+                         control=glmerControl(optCtrl=list(maxfun=3e5))) 
+    summary(rePCA(m.birthrate_st))
+    summary(m.birthrate_st)
+    plot(df.birth_st$count_t18_gc, df.birth_st$TS_st)
+  
+    #Reduced model - t18 count only
+    m.birthrate_st2 <- glmer(TS_st ~ count_t18_gc + 
+                              (1 + count_t18_gc | State), 
+                            data = df.birth_st,
+                            family = poisson(link = "log"), 
+                            control=glmerControl(optCtrl=list(maxfun=3e5))) 
+    summary(rePCA(m.birthrate_st2))
+    summary(m.birthrate_st2)
+    
+    #Get predicted values from model
+    
+    df.future <- BirthRateModel.df %>% 
+      filter(Year >= 2014 & count == 10 & is.na(State) == FALSE) %>% 
+      group_by(State, Year) %>% 
+      mutate(TS_st = sum(totalstudents)) %>% ungroup() %>% 
+      select(Year, State, TS_st, count_t18) %>% unique() %>% 
+      mutate(count_t18_gc = scale(count_t18 - mean(count_t18))) 
 
+    birthrateModel_st <- df.future %>% 
+      mutate(predvals = exp(predict(m.birthrate_st2, newdata = df.future, allow.new.levels = TRUE, re.form = ~(1 + count_t18_gc | State)))) %>% 
+      mutate(error = predvals - TS_st) 
+    
+    #Plot predicted vs. actual
+    St_birthrate_plot <- birthrateModel_st %>%
+      ggplot(aes(x = TS_st, y = predvals)) + geom_point() + geom_abline(intercept = 0, slope = 1) + 
+      ggtitle("Predicted Vs. Observed: Birthrate Model - State level, only t18") + facet_wrap(~Year)
+    
+    TEXAS <- BirthRateModel.df %>% 
+      filter(State == "TX" & count == 10 & is.na(State) == FALSE) %>% 
+      group_by(Year) %>% 
+      mutate(TS_st = sum(totalstudents)) %>% ungroup() %>% 
+      select(Year, TS_st, count_t18) %>% unique() %>% 
+      mutate(count_t18_gc = scale(count_t18 - mean(count_t18))) 
+    
+    plot(TEXAS$Year, TEXAS$count_t18_gc)
+    
+    TEXAS %>% 
+      ggplot(aes(x = count_t18_gc, y = TS_st, color = Year)) + geom_point()
+    
+    #summary
+      #t18 @ institution level is shit (not even sig)
+      #t18 @ state level is really good (except TEXAS)
+      #how to use t19 & t20?
+      #next up - adding to state level model now that we have birthrate, compare predicted values for new models that add year
+      
+    
