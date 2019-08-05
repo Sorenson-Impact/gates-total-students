@@ -439,7 +439,6 @@ birthdata <- birthdata %>%
   select(birthcount, State, datayear)
  # mutate(t18.year = datayear, t19.year = datayear, t20.year = datayear)
 
-
 df.total <- df.total %>% 
   mutate(datayear = Year -18) %>% 
   left_join(birthdata) %>% 

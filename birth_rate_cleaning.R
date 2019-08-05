@@ -59,6 +59,8 @@ natl1995 <- read_csv("/Volumes/GoogleDrive/My Drive/SI/DataScience/data/gates/Bi
 natl1994 <- read_csv("/Volumes/GoogleDrive/My Drive/SI/DataScience/data/gates/BirthData/natl1994.csv")
 natl1993 <- read_csv("/Volumes/GoogleDrive/My Drive/SI/DataScience/data/gates/BirthData/natl1993.csv")
 natl1992 <- read_csv("/Volumes/GoogleDrive/My Drive/SI/DataScience/data/gates/BirthData/natl1992.csv")
+natl1998 <- read_csv("/Volumes/GoogleDrive/My Drive/SI/DataScience/data/gates/BirthData/natl1998.csv")
+natl1999 <- read_csv("/Volumes/GoogleDrive/My Drive/SI/DataScience/data/gates/BirthData/natl1999.csv")
 
 fips <- fips_codes %>% 
   select(state, state_code) %>% 
@@ -136,6 +138,22 @@ births92 <- natl1992 %>%
   select(-c(stoccfip)) %>% 
   left_join(fips)
 
+births98 <- natl1998 %>% 
+  group_by(stoccfip) %>% 
+  count() %>% 
+  ungroup() %>% 
+  mutate(datayear = 1998, state_code = stoccfip) %>% 
+  select(-c(stoccfip)) %>% 
+  left_join(fips)
+
+births99 <- natl1999 %>% 
+  group_by(stoccfip) %>% 
+  count() %>% 
+  ungroup() %>% 
+  mutate(datayear = 1999, state_code = stoccfip) %>% 
+  select(-c(stoccfip)) %>% 
+  left_join(fips)
+
 write_rds(births88, "/Volumes/GoogleDrive/My Drive/SI/DataScience/data/gates/BirthData/births88.rds")
 write_rds(births89, "/Volumes/GoogleDrive/My Drive/SI/DataScience/data/gates/BirthData/births89.rds")
 write_rds(births90, "/Volumes/GoogleDrive/My Drive/SI/DataScience/data/gates/BirthData/births90.rds")
@@ -145,6 +163,8 @@ write_rds(births95, "/Volumes/GoogleDrive/My Drive/SI/DataScience/data/gates/Bir
 write_rds(births94, "/Volumes/GoogleDrive/My Drive/SI/DataScience/data/gates/BirthData/births94.rds")
 write_rds(births93, "/Volumes/GoogleDrive/My Drive/SI/DataScience/data/gates/BirthData/births93.rds")
 write_rds(births92, "/Volumes/GoogleDrive/My Drive/SI/DataScience/data/gates/BirthData/births92.rds")
+write_rds(births98, "/Volumes/GoogleDrive/My Drive/SI/DataScience/data/gates/BirthData/births98.rds")
+write_rds(births99, "/Volumes/GoogleDrive/My Drive/SI/DataScience/data/gates/BirthData/births99.rds")
 
 # lily playing around
 births88 <- read_rds("/Volumes/GoogleDrive/My Drive/SI/DataScience/data/gates/BirthData/births88.rds")
