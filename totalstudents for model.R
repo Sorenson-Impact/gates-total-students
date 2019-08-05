@@ -451,6 +451,9 @@ df.total <- df.total %>%
   left_join(birthdata) %>% 
   rename(t20 = birthcount)
 
-
-
+  #Model
+   <- glmer(totalstudents ~ poly(Year,3) + (1 + poly(Year,3) | UNITID) + (1 | State), 
+                       data = df.model,
+                       family = poisson(link = "log"), 
+                       control=glmerControl(optCtrl=list(maxfun=3e5))) 
 
