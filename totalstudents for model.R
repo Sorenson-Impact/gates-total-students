@@ -436,7 +436,7 @@ ggarrange(baseline.inst_plot14.zoom, baseline.inst_plot14.zout,
 birthdata <- read_rds("G:/My Drive/SI/DataScience/data/gates/BirthData/birthdata_for_model.rds")
 birthdata <- birthdata %>% 
   rename(Year = realyear, State = state)
- # mutate(t18.year = datayear, t19.year = datayear, t20.year = datayear)
+# mutate(t18.year = datayear, t19.year = datayear, t20.year = datayear)
 
 institutions <- read_csv("G:/My Drive/SI/DataScience/data/gates/IPEDS/Full Gates Download/IPEDS Data/Institutions.csv")
 institutions <- institutions %>% 
@@ -461,154 +461,154 @@ df.model <- BirthRateModel.df %>%
          count_t20_gc = scale(count_t20 - mean(count_t20)))
 
 
-  #Birthrate Model -- institution level ----
-  m.birthrate <- glmer(totalstudents ~ poly(Year,3) + count_t18_gc + 
-                         (1 + poly(Year,3) | UNITID) + 
-                         (1 + count_t18_gc | State), 
-                       data = df.model,
-                       family = poisson(link = "log"), 
-                       control=glmerControl(optCtrl=list(maxfun=3e5))) 
-  
-  summary(rePCA(m.birthrate))
-  summary(m.birthrate)
-  
-  test <- df.model %>% 
-    select(State, Year, totalstudents, count_t18,count_t19,count_t20) %>% 
-    group_by(State, Year) %>% 
-    mutate(TS_State = sum(totalstudents)) %>% 
-    select(TS_State, Year, count_t18, count_t19,count_t20) %>% ungroup() %>%  
-    unique()
-  
-  cor.test(test$count_t18, test$TS_State)
-  plot(test$count_t18, test$TS_State)
-  
-  # Model -- state level ----
-  df.birth_st <- df.model %>% 
-    select(State, totalstudents, Year, count_t18, count_t19, count_t20) %>% 
-    group_by(State, Year) %>% 
-    mutate(TS_st = sum(totalstudents)) %>% ungroup() %>% 
-    select(-c(totalstudents)) %>% 
-    unique() %>% 
-    mutate(count_t18_gc = scale(count_t18 - mean(count_t18)), Year_scaled = scale(Year - mean(Year)))
-           
-           
-  hist(df.birth_st$TS_st)
-  
-    #Full model
-    m.birthrate_st <- glmer(TS_st ~ Year_scaled + count_t18_gc +
+#Birthrate Model -- institution level ----
+m.birthrate <- glmer(totalstudents ~ poly(Year,3) + count_t18_gc + 
+                       (1 + poly(Year,3) | UNITID) + 
+                       (1 + count_t18_gc | State), 
+                     data = df.model,
+                     family = poisson(link = "log"), 
+                     control=glmerControl(optCtrl=list(maxfun=3e5))) 
+
+summary(rePCA(m.birthrate))
+summary(m.birthrate)
+
+test <- df.model %>% 
+  select(State, Year, totalstudents, count_t18,count_t19,count_t20) %>% 
+  group_by(State, Year) %>% 
+  mutate(TS_State = sum(totalstudents)) %>% 
+  select(TS_State, Year, count_t18, count_t19,count_t20) %>% ungroup() %>%  
+  unique()
+
+cor.test(test$count_t18, test$TS_State)
+plot(test$count_t18, test$TS_State)
+
+# Model -- state level ----
+df.birth_st <- df.model %>% 
+  select(State, totalstudents, Year, count_t18, count_t19, count_t20) %>% 
+  group_by(State, Year) %>% 
+  mutate(TS_st = sum(totalstudents)) %>% ungroup() %>% 
+  select(-c(totalstudents)) %>% 
+  unique() %>% 
+  mutate(count_t18_gc = scale(count_t18 - mean(count_t18)), Year_scaled = scale(Year - mean(Year)))
+
+
+hist(df.birth_st$TS_st)
+
+#Full model
+m.birthrate_st <- glmer(TS_st ~ Year_scaled + count_t18_gc +
+                          (1 | State), 
+                        data = df.birth_st,
+                        family = poisson(link = "log"), 
+                        control=glmerControl(optCtrl=list(maxfun=3e5))) #cubic year seems useful
+plot(m.birthrate_st)
+summary(rePCA(m.birthrate_st))
+summary(m.birthrate_st)
+
+plot(df.birth_st$count_t18_gc, df.birth_st$TS_st)
+anova(m.birthrate_st, m.birthrate_st.,m.birthrate_st..)
+
+plot(scale(df.birth_st$TS_st), df.birth_st$count_t18_gc)
+#Get predicted values from model
+
+df.future <- BirthRateModel.df %>% 
+  filter(Year >= 2014 & count == 10 & is.na(State) == FALSE) %>% 
+  group_by(State, Year) %>% 
+  mutate(TS_st = sum(totalstudents)) %>% ungroup() %>% 
+  select(Year, State, TS_st, count_t18) %>% unique() %>% 
+  mutate(count_t18_gc = scale(count_t18 - mean(count_t18)), Year_scaled = scale(Year - mean(Year))) 
+
+birthrateModel_st <- df.future %>% 
+  mutate(st1_predvals = exp(predict(m.birthrate_st, newdata = df.future, allow.new.levels = TRUE, re.form = ~(1 | State)))) %>% 
+  mutate(st1_error = st1_predvals - TS_st) 
+
+#Plot predicted vs. actual
+St_birthrate_plot <- birthrateModel_st %>%
+  ggplot(aes(x = TS_st, y = predvals, color = factor(State))) + geom_point() + geom_abline(intercept = 0, slope = 1) + 
+  ggtitle("Predicted Vs. Observed: Birthrate Model - State level, t18 and Year") +
+  facet_wrap(~Year) 
+
+
+#Reduced model - t18 count only ----
+m.birthrate_st2 <- glmer(TS_st ~ count_t18_gc + 
                            (1 | State), 
                          data = df.birth_st,
                          family = poisson(link = "log"), 
-                         control=glmerControl(optCtrl=list(maxfun=3e5))) #cubic year seems useful
-    plot(m.birthrate_st)
-    summary(rePCA(m.birthrate_st))
-    summary(m.birthrate_st)
-    
-    plot(df.birth_st$count_t18_gc, df.birth_st$TS_st)
-        anova(m.birthrate_st, m.birthrate_st.,m.birthrate_st..)
-        
-        plot(scale(df.birth_st$TS_st), df.birth_st$count_t18_gc)
-        #Get predicted values from model
-        
-        df.future <- BirthRateModel.df %>% 
-          filter(Year >= 2014 & count == 10 & is.na(State) == FALSE) %>% 
-          group_by(State, Year) %>% 
-          mutate(TS_st = sum(totalstudents)) %>% ungroup() %>% 
-          select(Year, State, TS_st, count_t18) %>% unique() %>% 
-          mutate(count_t18_gc = scale(count_t18 - mean(count_t18)), Year_scaled = scale(Year - mean(Year))) 
-        
-        birthrateModel_st <- df.future %>% 
-          mutate(st1_predvals = exp(predict(m.birthrate_st, newdata = df.future, allow.new.levels = TRUE, re.form = ~(1 | State)))) %>% 
-          mutate(st1_error = st1_predvals - TS_st) 
-        
-        #Plot predicted vs. actual
-        St_birthrate_plot <- birthrateModel_st %>%
-          ggplot(aes(x = TS_st, y = predvals, color = factor(State))) + geom_point() + geom_abline(intercept = 0, slope = 1) + 
-          ggtitle("Predicted Vs. Observed: Birthrate Model - State level, t18 and Year") +
-         facet_wrap(~Year) 
+                         control=glmerControl(optCtrl=list(maxfun=3e5))) 
+summary(rePCA(m.birthrate_st2))
+summary(m.birthrate_st2)
+std_beta(m.birthrate_st2)
+#Get predicted values from model
+birthrateModel_st2 <- df.future %>% 
+  mutate(st2_predvals = exp(predict(m.birthrate_st2, newdata = df.future, allow.new.levels = TRUE, re.form = ~(1 | State)))) %>% 
+  mutate(st2_error = st2_predvals - TS_st) 
 
-        
-    #Reduced model - t18 count only ----
-    m.birthrate_st2 <- glmer(TS_st ~ count_t18_gc + 
-                              (1 | State), 
-                            data = df.birth_st,
-                            family = poisson(link = "log"), 
-                            control=glmerControl(optCtrl=list(maxfun=3e5))) 
-    summary(rePCA(m.birthrate_st2))
-    summary(m.birthrate_st2)
-      std_beta(m.birthrate_st2)
-        #Get predicted values from model
-        birthrateModel_st2 <- df.future %>% 
-          mutate(st2_predvals = exp(predict(m.birthrate_st2, newdata = df.future, allow.new.levels = TRUE, re.form = ~(1 | State)))) %>% 
-          mutate(st2_error = st2_predvals - TS_st) 
-        
-        #Plot predicted vs. actual
+#Plot predicted vs. actual
 
-        
-        St2_birthrate_plot <- birthrateModel_st2 %>%
-          ggplot(aes(x = TS_st, y = predvals)) + geom_point() + geom_abline(intercept = 0, slope = 1) + 
-          ggtitle("Predicted Vs. Observed: Birthrate Model - State level, only t18") +
-          facet_wrap(~Year)
-        
-        St2_birthrateTime.plot <- birthrateModel_st2 %>% 
-          mutate(ModelPredictions = as.numeric(st2_predvals)) %>%
-          select(Year, ModelPredictions, TS_st) %>% 
-          gather(ModelPredictions, TS_st, key = "Data", value = "value") %>% 
-          group_by(Year, Data) %>% 
-          summarise(Total = sum(value)) %>% 
-          ggplot(aes(x = Year, y = Total, color = Data)) + geom_point(size = 10) + 
-          ggtitle("Predicted Vs. Observed: Birthrate Model - State level, only t18") 
-        
-        
-        
-        
-        TEXAS <- BirthRateModel.df %>% 
-          filter(State == "TX" & count == 10 & is.na(State) == FALSE) %>% 
-          group_by(Year) %>% 
-          mutate(TS_st = sum(totalstudents)) %>% ungroup() %>% 
-          select(Year, TS_st, count_t18) %>% unique() %>% 
-          mutate(count_t18_gc = scale(count_t18 - mean(count_t18))) 
-        
-        plot(TEXAS$Year, TEXAS$count_t18_gc)
-        
-        TEXAS %>% 
-          ggplot(aes(x = count_t18_gc, y = TS_st, color = Year)) + geom_point()
-    
-    #summary
-      #t18 @ institution level is shit (not even sig)
-      #t18 @ state level is really good (except TEXAS)
-      #how to use t19 & t20?
-      #next up - adding to state level model now that we have birthrate, compare predicted values for new models that add year
-      
-        #model comparisons ----
-        anova(m.birthrate_st, m.birthrate_st2)
-        plot(m.birthrate_st)
-        plot(m.birthrate_st2)
-        St_birthrate_plot
-        St2_birthrate_plot
-  
-        ModelComparePlot <- birthrateModel_st %>% 
-          left_join(birthrateModel_st2 %>% select(Year,State,st2_predvals,st2_error)) %>%
-          select(Year, State, st1_predvals, st2_predvals,TS_st) %>% 
-          gather(st1_predvals, st2_predvals, key = "model", value = "prediction") %>% 
-          mutate(error = prediction - TS_st) %>% 
-          ggplot(aes(x = TS_st, y = prediction, color = model)) + geom_point() + geom_abline(intercept = 0, slope = 1) + 
-          ggtitle("Predicted Vs. Observed: Birthrate Only vs. Birthrate & Year") + facet_wrap(~Year)
-        
-        ModelComparePlot2 <- birthrateModel_st %>% 
-          left_join(birthrateModel_st2 %>% select(Year,State,st2_predvals,st2_error)) %>%
-          select(Year, State, st1_predvals, st2_predvals,TS_st) %>% 
-          gather(st1_predvals, st2_predvals, key = "model", value = "prediction") %>% 
-          mutate(error_ratio = (prediction - TS_st)/TS_st) %>% 
-          ggplot(aes(x = TS_st, y = error_ratio, color = model, group = model)) + geom_boxplot() +
-          ggtitle("Predicted Vs. Observed: Birthrate Only vs. Birthrate & Year") + facet_wrap(~Year)
-        
-        ModelComparePlot3 <- birthrateModel_st %>% 
-          left_join(birthrateModel_st2 %>% select(Year,State,st2_predvals,st2_error)) %>%
-          select(Year, State, st1_predvals, st2_predvals,TS_st) %>% 
-          gather(st1_predvals, st2_predvals, key = "model", value = "prediction") %>%
-          mutate(error_ratio = (prediction - TS_st)/TS_st) %>% 
-          ggplot(aes(x = error_ratio, color = model, group = model, fill = model, alpha = 0.5, linetype = model)) + 
+
+St2_birthrate_plot <- birthrateModel_st2 %>%
+  ggplot(aes(x = TS_st, y = predvals)) + geom_point() + geom_abline(intercept = 0, slope = 1) + 
+  ggtitle("Predicted Vs. Observed: Birthrate Model - State level, only t18") +
+  facet_wrap(~Year)
+
+St2_birthrateTime.plot <- birthrateModel_st2 %>% 
+  mutate(ModelPredictions = as.numeric(st2_predvals)) %>%
+  select(Year, ModelPredictions, TS_st) %>% 
+  gather(ModelPredictions, TS_st, key = "Data", value = "value") %>% 
+  group_by(Year, Data) %>% 
+  summarise(Total = sum(value)) %>% 
+  ggplot(aes(x = Year, y = Total, color = Data)) + geom_point(size = 10) + 
+  ggtitle("Predicted Vs. Observed: Birthrate Model - State level, only t18") 
+
+
+
+
+TEXAS <- BirthRateModel.df %>% 
+  filter(State == "TX" & count == 10 & is.na(State) == FALSE) %>% 
+  group_by(Year) %>% 
+  mutate(TS_st = sum(totalstudents)) %>% ungroup() %>% 
+  select(Year, TS_st, count_t18) %>% unique() %>% 
+  mutate(count_t18_gc = scale(count_t18 - mean(count_t18))) 
+
+plot(TEXAS$Year, TEXAS$count_t18_gc)
+
+TEXAS %>% 
+  ggplot(aes(x = count_t18_gc, y = TS_st, color = Year)) + geom_point()
+
+#summary
+#t18 @ institution level is shit (not even sig)
+#t18 @ state level is really good (except TEXAS)
+#how to use t19 & t20?
+#next up - adding to state level model now that we have birthrate, compare predicted values for new models that add year
+
+#model comparisons ----
+anova(m.birthrate_st, m.birthrate_st2)
+plot(m.birthrate_st)
+plot(m.birthrate_st2)
+St_birthrate_plot
+St2_birthrate_plot
+
+ModelComparePlot <- birthrateModel_st %>% 
+  left_join(birthrateModel_st2 %>% select(Year,State,st2_predvals,st2_error)) %>%
+  select(Year, State, st1_predvals, st2_predvals,TS_st) %>% 
+  gather(st1_predvals, st2_predvals, key = "model", value = "prediction") %>% 
+  mutate(error = prediction - TS_st) %>% 
+  ggplot(aes(x = TS_st, y = prediction, color = model)) + geom_point() + geom_abline(intercept = 0, slope = 1) + 
+  ggtitle("Predicted Vs. Observed: Birthrate Only vs. Birthrate & Year") + facet_wrap(~Year)
+
+ModelComparePlot2 <- birthrateModel_st %>% 
+  left_join(birthrateModel_st2 %>% select(Year,State,st2_predvals,st2_error)) %>%
+  select(Year, State, st1_predvals, st2_predvals,TS_st) %>% 
+  gather(st1_predvals, st2_predvals, key = "model", value = "prediction") %>% 
+  mutate(error_ratio = (prediction - TS_st)/TS_st) %>% 
+  ggplot(aes(x = TS_st, y = error_ratio, color = model, group = model)) + geom_boxplot() +
+  ggtitle("Predicted Vs. Observed: Birthrate Only vs. Birthrate & Year") + facet_wrap(~Year)
+
+ModelComparePlot3 <- birthrateModel_st %>% 
+  left_join(birthrateModel_st2 %>% select(Year,State,st2_predvals,st2_error)) %>%
+  select(Year, State, st1_predvals, st2_predvals,TS_st) %>% 
+  gather(st1_predvals, st2_predvals, key = "model", value = "prediction") %>%
+  mutate(error_ratio = (prediction - TS_st)/TS_st) %>% 
+  ggplot(aes(x = error_ratio, color = model, group = model, fill = model, alpha = 0.5, linetype = model)) + 
           geom_density() + geom_vline(aes(group = model, xintercept=0)) +
           ggtitle("Predicted Vs. Observed: Birthrate Only vs. Birthrate & Year") + facet_wrap(~Year)
         
@@ -669,15 +669,13 @@ df.model <- BirthRateModel.df %>%
           scale_y_continuous(limits = c(0,1.5e6)) +
           facet_wrap(~Year)
         
-        #Model comparisons
-        ModelComparePlot4 <- st3_pred.re %>% 
-          left_join(st3_pred.re %>% select(Year,State,st4_predvals,st4_error)) %>%
-          select(Year, State, Inst_Type,st3_predvals, st4_predvals,TS_st) %>% 
-          gather(st3_predvals, st4_predvals, key = "model", value = "prediction") %>%
-          mutate(error_ratio = (prediction - TS_st)/TS_st) %>% 
-          ggplot(aes(x = error_ratio, color = model, group = model, fill = model, alpha = 0.5, linetype = model)) + 
-          geom_density() + geom_vline(aes(group = model, xintercept=0)) +
-          ggtitle("Predicted Vs. Observed: Birthrate Inst with & Without REs") 
+        #TEXAS?
+        df.model
+        
+        df.total_st %>% 
+          filter(State == "TX") %>% 
+          ggplot(aes(x = Year , y = TS_st, color = Year, shape = Inst_Type)) + geom_point(size = 7) 
+          
         
         #best model so far is likely - m_st3_insttype WITH RANDOM EFFECTS OF PREDICTORS
 
