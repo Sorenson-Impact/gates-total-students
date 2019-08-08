@@ -29,7 +29,8 @@ readRenviron("~/.Renviron")
 
 us <- unique(fips_codes$state)[1:51]
 
-acsvars <- load_variables(year = 2012, "acs5", cache = T) %>%
+# still need ACS 2008 data
+acsvars <- load_variables(year = 2009, "acs5", cache = T) %>%
   mutate(level = str_count(label, pattern = "!!")) %>%
   rowwise() %>%
   mutate(levlab = str_split(label, pattern = "!!") %>% unlist() %>% .[level + 1]) %>%
@@ -71,12 +72,35 @@ employment_test_2010 <- future_map_dfr(us, function(x){
   si_acs("B23001", year = 2010, geography = "state", state = x)
 }, .progress = T)
 
+employment_test_2011 <- future_map_dfr(us, function(x){
+  si_acs("B23001", year = 2011, geography = "state", state = x)
+}, .progress = T)
 
 employment_test_2012 <- future_map_dfr(us, function(x){
   si_acs("B23001", year = 2012, geography = "state", state = x)
 }, .progress = T)
 
-employment_spread <- employment_test_2010 %>% 
+employment_test_2013 <- future_map_dfr(us, function(x){
+  si_acs("B23001", year = 2013, geography = "state", state = x)
+}, .progress = T)
+
+employment_test_2014 <- future_map_dfr(us, function(x){
+  si_acs("B23001", year = 2014, geography = "state", state = x)
+}, .progress = T)
+
+employment_test_2015 <- future_map_dfr(us, function(x){
+  si_acs("B23001", year = 2015, geography = "state", state = x)
+}, .progress = T)
+
+employment_test_2016 <- future_map_dfr(us, function(x){
+  si_acs("B23001", year = 2016, geography = "state", state = x)
+}, .progress = T)
+
+employment_test_2017 <- future_map_dfr(us, function(x){
+  si_acs("B23001", year = 2017, geography = "state", state = x)
+}, .progress = T)
+
+employment_spread_2017 <- employment_test_2017 %>% 
   select(c(county, estimate, label)) %>% 
   spread(key = label, value = estimate) %>% 
   mutate(employed = reduce(select(., ends_with("Employed")), `+`),
@@ -84,7 +108,7 @@ employment_spread <- employment_test_2010 %>%
          total = employed + unemployed,
          unemployment_rate = unemployed/total)
 
-write_rds(employment_spread, "G:/My Drive/SI/DataScience/data/gates/census data/employment_data2010.rds")
+write_rds(employment_spread_2017, "/Volumes/GoogleDrive/My Drive/SI/DataScience/data/gates/census data/employment_data_2017.rds")
 
 
 #Birth Data Cleaning-----
@@ -127,19 +151,30 @@ births93.clean <- births91 %>%
 write_rds(births93.clean, "G:/My Drive/SI/DataScience/data/gates/BirthData/births93.rds")
 
 #Load in all data
-births88 <- read_rds("G:/My Drive/SI/DataScience/data/gates/BirthData/births88.rds") 
-births89 <- read_rds("G:/My Drive/SI/DataScience/data/gates/BirthData/births89.rds") 
-births90 <- read_rds("G:/My Drive/SI/DataScience/data/gates/BirthData/births90.rds") 
-births91 <- read_rds("G:/My Drive/SI/DataScience/data/gates/BirthData/births91.rds")
-births92 <- read_rds("G:/My Drive/SI/DataScience/data/gates/BirthData/births92.rds") 
-births93 <- read_rds("G:/My Drive/SI/DataScience/data/gates/BirthData/births93.rds") 
-births94 <- read_rds("G:/My Drive/SI/DataScience/data/gates/BirthData/births94.rds")
-births95 <- read_rds("G:/My Drive/SI/DataScience/data/gates/BirthData/births95.rds") 
-births96 <- read_rds("G:/My Drive/SI/DataScience/data/gates/BirthData/births96.rds") 
-births97 <- read_rds("G:/My Drive/SI/DataScience/data/gates/BirthData/births97.rds") 
-births98 <- read_rds("G:/My Drive/SI/DataScience/data/gates/BirthData/births98.rds") 
-births99 <- read_rds("G:/My Drive/SI/DataScience/data/gates/BirthData/births99.rds")
+# births88 <- read_rds("G:/My Drive/SI/DataScience/data/gates/BirthData/births88.rds") 
+# births89 <- read_rds("G:/My Drive/SI/DataScience/data/gates/BirthData/births89.rds") 
+# births90 <- read_rds("G:/My Drive/SI/DataScience/data/gates/BirthData/births90.rds") 
+# births91 <- read_rds("G:/My Drive/SI/DataScience/data/gates/BirthData/births91.rds")
+# births92 <- read_rds("G:/My Drive/SI/DataScience/data/gates/BirthData/births92.rds") 
+# births93 <- read_rds("G:/My Drive/SI/DataScience/data/gates/BirthData/births93.rds") 
+# births94 <- read_rds("G:/My Drive/SI/DataScience/data/gates/BirthData/births94.rds")
+# births95 <- read_rds("G:/My Drive/SI/DataScience/data/gates/BirthData/births95.rds") 
+# births96 <- read_rds("G:/My Drive/SI/DataScience/data/gates/BirthData/births96.rds") 
+# births97 <- read_rds("G:/My Drive/SI/DataScience/data/gates/BirthData/births97.rds") 
+# births98 <- read_rds("G:/My Drive/SI/DataScience/data/gates/BirthData/births98.rds") 
+# births99 <- read_rds("G:/My Drive/SI/DataScience/data/gates/BirthData/births99.rds")
 
+
+births88 <- read_rds("/Volumes/GoogleDrive/My Drive/SI/DataScience/data/gates/BirthData/births88.rds") 
+births89 <- read_rds("/Volumes/GoogleDrive/My Drive/SI/DataScience/data/gates/BirthData/births89.rds") 
+births90 <- read_rds("/Volumes/GoogleDrive/My Drive/SI/DataScience/data/gates/BirthData/births90.rds") 
+births91 <- read_rds("/Volumes/GoogleDrive/My Drive/SI/DataScience/data/gates/BirthData/births91.rds")
+births92 <- read_rds("/Volumes/GoogleDrive/My Drive/SI/DataScience/data/gates/BirthData/births92.rds") 
+births93 <- read_rds("/Volumes/GoogleDrive/My Drive/SI/DataScience/data/gates/BirthData/births93.rds") 
+births94 <- read_rds("/Volumes/GoogleDrive/My Drive/SI/DataScience/data/gates/BirthData/births94.rds")
+births95 <- read_rds("/Volumes/GoogleDrive/My Drive/SI/DataScience/data/gates/BirthData/births95.rds") 
+births96 <- read_rds("/Volumes/GoogleDrive/My Drive/SI/DataScience/data/gates/BirthData/births96.rds") 
+births97 <- read_rds("/Volumes/GoogleDrive/My Drive/SI/DataScience/data/gates/BirthData/births97.rds") 
 births98 <- read_rds("/Volumes/GoogleDrive/My Drive/SI/DataScience/data/gates/BirthData/births98.rds") 
 births99 <- read_rds("/Volumes/GoogleDrive/My Drive/SI/DataScience/data/gates/BirthData/births99.rds")
 

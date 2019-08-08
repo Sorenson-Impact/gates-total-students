@@ -9,47 +9,6 @@ library(tidyverse)
 library(purrr)
 library(tidycensus)
 
-si_ggplot_theme_update()
-si_knitr_settings()
-gdrive_dir <- "/Volumes/GoogleDrive/My Drive/SI/DataScience/data/gates/BirthData"
-
-load("~/Google Drive/SI/DataScience/Pritzker/ACS Data/geoids lookup table.RData")
-
-# Get wondr data
-# Settings: select years individually
-# use bridged race because it has fewer categories / fewer suppressions
-
-files <- dir_ls(path(gdrive_dir),glob = "*.txt")
-wonder <- files %>% 
-  map(function(x) {
-    suppressWarnings(read_tsv(x)) %>% #na = c("", "NA", "Suppressed"), col_types = cols(Births = "i")
-      clean_names() %>% 
-      filter(!is.na(county)) %>% 
-      select(-notes) %>% 
-      separate(col = county, into = c("county", "state"), sep = ", ") %>% 
-      
-      rename(geoid = county_code) %>% 
-      
-      select(-contains("_code")) %>% 
-      add_column(source = str_sub(basename(x), end = -5)) %>% 
-      separate(source, into = c("data", "subgroup"), sep = " X ")
-  } 
-  ) %>% set_names(str_sub(basename(files), end = -5))
-
-#Number of births without race/ethnicity
-all_births <- wonder %>% 
-  reduce(bind_rows) %>% 
-  filter(year <= 1997)
-
-#   select(-subgroup) %>% 
-#   left_join(filter(., data == "all births") %>%
-#               select(geoid, year, all_births = births)) %>%
-#   mutate() %>% 
-#   full_join(geoids$county %>% select(-state_name, -name_county), by = c("geoid" = "GEOID", "county", "state")) %>% 
-#   complete(year, nesting(county, state, geoid), data) %>% 
-#   filter(!is.na(year), !is.na(data)) %>% 
-#   mutate_all(funs(replace_na(., "Data Unavailable")))
-
 natl1988 <- read_csv("/Volumes/GoogleDrive/My Drive/SI/DataScience/data/gates/BirthData/natl1988.csv")
 natl1989 <- read_csv("/Volumes/GoogleDrive/My Drive/SI/DataScience/data/gates/BirthData/natl1989.csv")
 natl1990 <- read_csv("/Volumes/GoogleDrive/My Drive/SI/DataScience/data/gates/BirthData/natl1990.csv")
@@ -166,31 +125,4 @@ write_rds(births92, "/Volumes/GoogleDrive/My Drive/SI/DataScience/data/gates/Bir
 write_rds(births98, "/Volumes/GoogleDrive/My Drive/SI/DataScience/data/gates/BirthData/births98.rds")
 write_rds(births99, "/Volumes/GoogleDrive/My Drive/SI/DataScience/data/gates/BirthData/births99.rds")
 
-# lily playing around
-births88 <- read_rds("/Volumes/GoogleDrive/My Drive/SI/DataScience/data/gates/BirthData/births88.rds")
-births89 <- read_rds("/Volumes/GoogleDrive/My Drive/SI/DataScience/data/gates/BirthData/births89.rds")
-births90 <- read_rds("/Volumes/GoogleDrive/My Drive/SI/DataScience/data/gates/BirthData/births90.rds")
 
-rm(natl1988)
-rm(natl1989)
-rm(natl1990)
-
-births88 <- births88 %>% 
-  rename(births_1988 = n) %>% 
-  select(-c(datayear))
-births89 <- births89 %>% 
-  rename(births_1989 = n) %>% 
-  select(-c(datayear))
-births90 <- births90 %>% 
-  rename(births_1990 = n) %>% 
-  select(-c(datayear))
-
-birthdata <- bind_rows(births88, births89, births90)
-
-birthdata <- birthdata %>% 
-  mutate(t18 = datayear + 18,
-         t19 = datayear+19,
-         t20 = datayear+20)
-
-t <- left_join(births88, births89, by = c("state", "state_code")) %>%
-  left_join(births90)
