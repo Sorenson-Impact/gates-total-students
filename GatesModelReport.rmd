@@ -1,0 +1,362 @@
+---
+title: 'Gates: College Going Model Report'
+author: "Grant Pointon & Lily Bailey"
+date: "August 8, 2019"
+output: 
+  html_document:
+    code_folding: "hide"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(siverse)
+```
+
+##Data
+
+
+```{r data, message=FALSE,warning=FALSE}
+
+efastate <- read_rds("G:/My Drive/SI/DataScience/data/gates/total_student_model/efastate.rds")
+
+
+birthdata <- read_rds("G:/My Drive/SI/DataScience/data/gates/BirthData/birthdata_for_model.rds")
+birthdata <- birthdata %>% 
+  rename(Year = realyear, State = state)
+
+institutions <- read_csv("G:/My Drive/SI/DataScience/data/gates/IPEDS/Full Gates Download/IPEDS Data/Institutions.csv")
+institutions <- institutions %>% 
+  select(UNITID = `Institution ID`, State,`Degree Granting`) %>% 
+  unique()
+
+sensitivity <- read_rds("G:/My Drive/SI/DataScience/data/gates/sensitivity/sensitivity.rds")
+sensitivity <- sensitivity %>% select(UNITID = unitid, Level, acceptance_rate, tuition_rev) %>%
+  unique()
+
+
+# Make total and state wrapped datasets ----
+df.total <- sensitivity %>%
+  left_join(efastate) %>% 
+  group_by(UNITID) %>% 
+  mutate(count = max(cumsum(UNITID)/UNITID)) %>% ungroup()
+
+df.total. <- df.total %>% 
+  left_join(institutions) %>% 
+  left_join(birthdata) 
+
+df.total_st <- df.total. %>% 
+  filter(count == 10) %>% 
+  select(State, totalstudents, FTFT, Year, Level, count_t18) %>% 
+  group_by(State, Year,Level) %>% 
+  mutate(TS_st = sum(totalstudents), FTFT_sum = sum(FTFT)) %>% ungroup() %>% 
+  select(-c(totalstudents, FTFT)) %>% 
+  unique() %>% 
+  mutate(count_t18_gc = scale(count_t18 - mean(count_t18, na.rm = TRUE)),
+         Inst_Type = factor(Level))
+
+head(df.total_st)
+
+```
+Above is the final version of the data we used for each of the models reported below.  Our two main outcome variables are "TS_st" and "FTFT_sum", which represent the total students and total first time (full time) students enrolled in a given state for each institution type (2-Year, 4-Year, National 4-YR, and Elite 4-Year) during the years 2008 - 2017, respectively.  Our two main predictor variables are "count_t18_gc" and "Inst_Type".  count_t18 represents the birthrate count for a given state 18 years prior to the year that the total and first time student counts were recorded.  To reduce any potential multicolineraity and to provide the model with a more appropriate scale, we grand centered (count - mean(count_t18)) count_t18 and then z-scored the grand centered values.
+
+###Outcome variable analysis 
+Before running any statistical analysis on our data, it was first necessary to assess the distribution of our outcome variables (TS_st & FTFT_sum).  This is required because regression analysis carries with it assumptions about both the structure of your data and the distribution of your outcomes.  Normal OLS regression assumes that your outcome variable(s) are normally distributed. If the outcome variable(s) are not normally distributed, then alternative regression methods are required for better model fit, and better theoretical assumptions about your data.  Below are two histograms that describe the distribution of our two outcome variables. As can be seen below, TS_st is not normally distributed.  If it were, the bars would roughly match the curve of the black line.   
+
+```{r Data, message=FALSE,warning=FALSE }
+#Total students hist
+TS <- df.total_st$TS_st
+h <- hist(TS, breaks = 10, density = 10,
+          col = "lightgray", xlab = "Total Students", main = "Histogram of Total Students") 
+xfit <- seq(min(TS), max(TS), length = 40) 
+yfit <- dnorm(xfit, mean = mean(TS), sd = sd(TS)) 
+yfit <- yfit * diff(h$mids[1:2]) * length(TS) 
+
+lines(xfit, yfit, col = "black", lwd = 2)
+
+```
+
+
+```{r, message=FALSE,warning=FALSE}
+#Total first time full time hist
+FTFT <- df.total_st$FTFT_sum
+h <- hist(FTFT, breaks = 10, density = 10,
+          col = "lightgray", xlab = "Total First Time Full Time Students", main = "Histogram of FTFT Students") 
+xfit <- seq(min(FTFT), max(FTFT), length = 40) 
+yfit <- dnorm(xfit, mean = mean(FTFT), sd = sd(FTFT)) 
+yfit <- yfit * diff(h$mids[1:2]) * length(FTFT) 
+
+lines(xfit, yfit, col = "black", lwd = 2)
+```
+
+As with our total student counts, the counts for first time (full time) students is also drastically different from a normally distributed set of data.  
+
+Given the non-normality of both of our outcome variables, it is appropriate to shift the assumption of our distributions from a normal distribution to a poisson distribution.  Poisson distributions assume that values are in a count format, values cannot be negative, and that the majority of the data is skewed towards 0.  Our data matches each of these assumptions well, and is the reason why we have chosen to run generalized linear models with the assumption of a poisson distribution.  Further details on the poisson's log link function will be described in the following sections.  
+
+
+## Total Students Model
+First, we report our full total students model that attempts to predict the total number of college going students in a given state and for a given institution type between the years 2008-2013.  We chose to 'train' the model on the years of 2008-2013 simply because we wanted a balance between having enough data for the model and enough remaining data to compare the model's predictions with actual enrollment counts.  
+```{r Filtering code, message=FALSE,warning=FALSE}
+df.model_st <- df.total_st %>% 
+  filter(Year < 2014 & is.na(count_t18) == FALSE)
+
+df.future_st <- df.total_st %>% 
+  filter(Year >= 2014 & is.na(State) == FALSE)
+
+```
+
+The model below is known as a generalized mixed model (AKA Hierarchical Generalized Linear Model or linear mixed effects regression).  Mixed models are similar to regular OLS regression, but they allow modelers to account for the nested structure of data through random intercepts, and they allow modelers to free up the estimation of a predictors effect based on the nested grouping structure.  In our case, we ran a 2-level model.  The first level is the observation level (i.e., at the level of individual rows), and the second level is at the state level. By including the state level, it allows the model to estimate different intercepts for each state, and as will be shown, different estimates of the effects for each predictor that is included in the model.
+
+### 1. Full Model: Total Students
+The model below includes two main predictors: the z-scored grand centered birthrate counts 18 years prior to the year the total students count was recorded, and institution type, which has 4 seperate levels.  We chose to have birth rates interact with insitution type because enrollment between different institution types is likely not as dependent on our estimate of the number of 18 year olds in that state. Furthermore, we allowed the model to freely estimate the individual effects of birth rate 18 years prior and institution type on total student enrollment for each state.
+
+```{r Full Total Student Model, message=FALSE,warning=FALSE}
+library(lme4)
+m_full <- glmer(TS_st ~ count_t18_gc*Inst_Type +
+                          (1 + count_t18_gc + Inst_Type | State), 
+                        data = df.model_st,
+                        family = poisson(link = "log"), 
+                        control=glmerControl(optCtrl=list(maxfun=3e5)))
+summary(m_full)
+```
+Above is a summary of the model results, which are shown for readers who are interested in the final estimates of the effects of birth rate and institution type on the total student enrollment. Notably, the coefficients reported here and in the subsequent models are in log form, because the poisson general linear model uses a log link function to fit predictor values to outcome values.
+
+To demonstrate to readers what the random intercept and random effects do, we provide the following table, which shows the estimated rand intercepts and effects for each state.
+
+```{r Full Model Random Effects, message=FALSE,warning=FALSE}
+coefs <- coef(m_full)$State
+coefs[1:5]
+```
+
+
+To assess this model's performance on total student enrollment from 2014-2017, we use the 'predict()' function, which is normally meant for OLS regression, but is modified by the 'lme4' package to work with mixed models. Additionally, we exponentiate the predicted values because they are still in log form, which is the appropriate way to trasnform poisson glm predictions back to the raw metric of the data (i.e., counts of total students) (Raudenbush & Bryk, 2002).  
+
+```{r Full model predictions, message=FALSE,warning=FALSE}
+#Plot predicted vs. actual
+m_full_pred <- df.future_st %>% 
+  mutate(m_full_predvals = exp(predict(m_full, newdata = df.future_st, allow.new.levels = TRUE, 
+                                    re.form = ~(1 + count_t18_gc + Inst_Type| State)))) %>% 
+  mutate(m_full_error = m_full_predvals - TS_st) 
+
+
+m_full_plot <- m_full_pred %>%
+  ggplot(aes(x = TS_st, y = m_full_predvals, color = Inst_Type)) + geom_point() +
+  geom_abline(intercept = 0, slope = 1) + 
+  ggtitle("Predicted Vs. Observed: Birthrate & Institution Type, Full Model, All RE's") +
+  theme_minimal() + ylab("Predicted Total Enrollment") + xlab("Actual Total Enrollment") +
+  scale_y_continuous(limits = c(0,1.5e6)) +
+  facet_wrap(~Year)
+m_full_plot
+```
+
+The plots above show the predicted values from the model for each year for a given institution type in a given state on the y-axis and the actual total enrollment for that year on the x-axis.  The black line has an intercept of 0 and slope of 1, which would indicate perfect fit between the predicted and actual values.  Though the scale of this plot is quite large and the absolute value of errors is difficult to see, the model seems to be doing fairly well. The overall correlation between the predicted values and observed data is...
+```{r correlation, message=FALSE,warning=FALSE}
+corr <- cor(m_full_pred$m_full_predvals, m_full_pred$TS_st)
+corr
+```
+
+However, one can also see that there are a few predictions that stray far away from the perfect fit line.  Upon inspection of the data, we found that the largest discrepencies between the predicted and actual data were for the state of Texas.  In fact, the reason for the warning message is because the predicted total enrollment in Texas for 2-Yr insitutions in 2017 was higher than the limit placed on the y-axis. Below is a plot of the average residual error for each state across year and insitution type.
+```{r State error, message=FALSE,warning=FALSE}
+m_full_plot_error <- m_full_pred %>%
+  select(State, m_full_error) %>% 
+  group_by(State) %>% 
+  mutate(mean_error = mean(m_full_error)) %>% 
+  select(-c(m_full_error)) %>% 
+  unique() %>% 
+    ggplot(aes(x = reorder(State,mean_error), y = mean_error, color = State)) + geom_point(size = 3) +
+      ggtitle("Mean Model Error for each State across Institution Type and Year") + 
+      xlab("") + ylab("Mean Error (predicted - observed)") +
+      theme_minimal() +
+      theme(axis.text.x = element_text(angle = 90, hjust = 1, face = "bold")) + 
+      guides(color = FALSE)
+m_full_plot_error
+```
+
+The above plot makes clear just how poorly this model estimates the total enrollment in Texas across all years and insitution types.  To investigate why the model performs so poorly for Texas, we looked into the relationship between birthrate in Texas and total student enrollment. 
+
+```{r Texas, message=FALSE,warning=FALSE}
+    TX <- df.total_st %>% 
+      filter(State == "TX" & Inst_Type == "2-Yr" | State == "TX" & Inst_Type == "4-Yr") %>% 
+      select(Year, TS_st, count_t18, Inst_Type) %>% 
+      group_by(Year, Inst_Type) %>% 
+      mutate(totalstudents = sum(TS_st)) %>% 
+      select(-c(TS_st)) %>% unique() %>% 
+      mutate(Time = as.factor(ifelse(Year < 2014, "2008-2013", "2014 - 2017"))) %>% 
+        ggplot(aes(x = count_t18, y = totalstudents, color = Time, shape = Inst_Type)) + 
+        scale_shape_manual(values=c(1,6))+
+        scale_colour_manual(values=c("black", "blue"))+
+        theme_minimal() +
+        geom_point(size = 3) + ylab("Total Students Enrolled") + xlab("Birth Counts 18 Years Prior")
+TX
+```
+What can be seen from the graph above is that the relationship between birth rate counts 18 years prior and total student enrollment counts in Texas is far steeper from 2008-2013 compared to 2014-2017.  Since we allowed the model to estimate the effect of birth counts seperately for each state, the model would in this case predict that the relationship between birth counts and total students to continue on its steep projection, which is why the model drastically overshoots the actual data. 
+
+To account for this oddity, we ran the model again, but without the random effect of birth rate counts.  Therefore, the model below is no longer free to estimate the effect of birth rate counts on total student enrollment for each state and will instead only estimate a fixed effect of birth rate counts on total student enrollment for all states.
+
+### 2. Reduced Model: Total Students with no random effect of birth counts
+We begin first with the summary of the reduced model's output.  
+```{r Reduced total student model, message=FALSE,warning=FALSE}
+m_2 <- glmer(TS_st ~ count_t18_gc*Inst_Type +
+                  (1 + Inst_Type | State), 
+                data = df.model_st,
+                family = poisson(link = "log"), 
+                control=glmerControl(optCtrl=list(maxfun=3e5)))
+
+summary(m_2)
+```
+Next, we provide plots of the predicted versus actual data for the reduced model.
+```{r Reduced model predictions, message=FALSE,warning=FALSE}
+#Plot predicted versus actual
+m_2_pred <- df.future_st %>% 
+  mutate(m_2_predvals = exp(predict(m_2, newdata = df.future_st, allow.new.levels = TRUE, 
+                                       re.form = ~(1 + Inst_Type| State)))) %>% 
+  mutate(m_2_error = m_2_predvals - TS_st) 
+
+m_2_plot <- m_2_pred %>%
+  ggplot(aes(x = TS_st, y = m_2_predvals, color = Inst_Type)) + geom_point() + geom_abline(intercept = 0, slope = 1) + 
+  ggtitle("Predicted Vs. Observed: Birthrate & Institution Type, Reduced Model, Only Inst. Type RE") + theme_minimal() + ylab("Predicted Total Enrollment") + xlab("Actual Total Enrollment") +
+  scale_y_continuous(limits = c(0,1.5e6)) +
+  facet_wrap(~Year)
+m_2_plot
+
+```
+As can be seen by the plots above, the reduced model's predictions no longer have any seemingly drastic outlier predictions.  If we produce the same plot of actual errors by state again but with the reduced model's predictions, we get the following graph.
+
+```{r Reduced plot error, message=FALSE, warning=FALSE}
+m_2_plot_error <- m_2_pred %>%
+  select(State, m_2_error) %>% 
+  group_by(State) %>% 
+  mutate(mean_error = mean(m_2_error)) %>% 
+  select(-c(m_2_error)) %>% 
+  unique() %>% 
+    ggplot(aes(x = reorder(State,mean_error), y = mean_error, color = State)) + geom_point(size = 3) +
+      ggtitle("Mean Model Error for each State across Institution Type and Year") + 
+      xlab("") + ylab("Mean Error (predicted - observed)") +
+      theme_minimal() +
+      theme(axis.text.x = element_text(angle = 90, hjust = 1, face = "bold")) + 
+      guides(color = FALSE)
+m_2_plot_error
+```
+Interestingly, predictions for Texas have now become the most underestimated, but relative to the previous full model, the predictions are now all within 25,000 students of the actual total student enrollment.  In fact, for 41 out of the 50 states, the reduced model's predictions are off by less than 5000 students.
+
+If we compare the two models' errors as a ratio of the actual data, the following plot is produced. 
+```{r total student model comparison}
+m_compare_full_m2 <- m_full_pred %>% #density plot
+  left_join(m_2_pred %>% select(Year,State,Inst_Type,m_2_predvals,m_2_error)) %>%
+  select(Year, State, m_full_predvals, m_2_predvals,TS_st) %>% 
+  gather(m_full_predvals, m_2_predvals, key = "model", value = "prediction") %>%
+  mutate(error_ratio = (prediction - TS_st)/TS_st) %>% 
+  ggplot(aes(x = error_ratio, fill = model, color = model, alpha = 0.2)) + 
+  geom_density() + geom_vline(aes(group = model, xintercept=0)) +
+  ggtitle("Total Student Error Ratios: Full Model vs. Reduced Model") + xlab("Error as a Ratio of Actual Enrollment Count") +
+  scale_x_continuous(limits = c(-0.8,0.8)) + theme_minimal() + 
+  scale_fill_manual(values = c("blue", "yellow")) +
+    scale_colour_manual(values = c("white", "black")) +
+theme(legend.position = "none")
+m_compare_full_m2
+```
+The yellow area represents the full model's distribution of error ratios and the blue distribution represents the reduced model's distribution of error ratios.  The vertical line represents a ratio of 0, which would indicate a perfect prediction compared to the actual data.  This graph clearly shows that the reduced model is performing much better than the full model, as its distribution is more tightly shaped around the perfect fit line.  Below is a table of more descriptive statistics about the reduced model's performance.
+
+```{r Reduced Model Performance, message=FALSE,warning=FALSE}
+
+#Descriptives on reduced model
+RedMod_desc <- as.data.frame(cor(m_2_pred$m_2_predvals, m_2_pred$TS_st))
+
+options(scipen = 999)
+RedMod_desc %>% 
+  rename(PredVsActual_Correlation = `cor(m_2_pred$m_2_predvals, m_2_pred$TS_st)`) %>% 
+  mutate(min_error =  min(m_2_pred$m_2_error),
+         median_error =  median(m_2_pred$m_2_error), 
+         mean_error = mean(m_2_pred$m_2_error),
+         max_error = max(m_2_pred$m_2_error),
+         percent_error = sum(abs(m_2_pred$m_2_error))/sum(m_2_pred$TS_st)) %>% 
+  gather(1:6, key = "Fit Index", value = "Value")
+
+
+```
+
+Based on the above graphs and fit indices, it is clear that the reduced model is performing extremely well.  The correlation between the predicted and actual values, across year and institution type, is 0.996.  At its worst, the Reduced Model underestimates college enrollment by about 116,069 students and overestimates college enrollment by about 72,806.  However, on average the model is off by only about 480 students, which is somewhat exaggerated due to a positive skew indicated by the fact that the median error rate is about a 42 student underestimation.  
+
+Currently, we consider this 'Reduced Model' as our best predictor of future college enrollment.  Since data exists on birth rates 18 years before college enrollment counts far into the future, we can use this model to predict the total amount of students for a given state and insitution type from 2018 - 2035.  The plot below shows the current model's predictions for the total college enrollment counts for the years 2018 - 2035.
+```{r Future Predictions total students}
+plot(x = 2, y = 3)
+```
+
+## First Time Full Time Students
+Given that our model above performed well for total student estimates, we investigate if the same model could also predict the total number of first time (full time) students.  We expected that this would be the case because the correlation between first time student and total student counts were quite similar (0.96).  
+```{r scatter}
+cor(df.total_st$TS_st, df.total_st$FTFT_sum)
+```
+### Reduced Model: First Time Full Time Students
+Here the same Reduced Model is applied to first time (full time) student counts between the years of 2008 - 2013.  The results are shown below. (Note: we did run the model with all random effects included, but as with our other full model on total students, Texas was drastically overestimated).
+```{r FTFT model}
+m.FTFT <- glmer(FTFT_sum ~ count_t18_gc*Inst_Type +
+                  (1 + Inst_Type | State), 
+                data = df.model_st,
+                family = poisson(link = "log"), 
+                control=glmerControl(optCtrl=list(maxfun=3e5)))
+
+summary(m.FTFT)
+```
+
+
+In terms of performance, the model also seems to do quite well at predicting first time (full time) students, even up to four years into the future.  
+
+```{r FTFT model plots}
+#Plot predicted vs. actual
+m.FTFT_pred <- df.future_st %>% 
+  mutate(m.FTFT_predvals = exp(predict(m.FTFT, newdata = df.future_st, allow.new.levels = TRUE, 
+                                    re.form = ~(1 + Inst_Type | State)))) %>% 
+  mutate(m.FTFT_error = m.FTFT_predvals - FTFT_sum) %>% 
+  mutate(m.FTFT_erroratio = (m.FTFT_predvals - FTFT_sum)/FTFT_sum)
+
+m.FTFT_plot <- m.FTFT_pred %>%
+  ggplot(aes(x = FTFT_sum, y = m.FTFT_predvals, color = Inst_Type)) + geom_point() + geom_abline(intercept = 0, slope = 1) + 
+  ggtitle("Predicted FTFT vs. Observed FTFT: Birthrate & Institution Type, Reduced model, All RE's") +
+  theme_minimal() + ylab("Predicted Total Enrollment") + xlab("Actual Total Enrollment") +
+  facet_wrap(~Year)
+m.FTFT_plot
+```
+The table below shows that the actual fit of this model is slightly worse than the model's performance on total students. While the range of the model's error seems smaller, the percent error for first time (full time) students is about 3% points higher than the model's percent error on total students.  Still, the correlation between the model's predicted first time student counts and actual first time student counts is very high, and in conjunction with the median and mean error suggests good model fit.
+
+```{r}
+#Descriptives on reduced model
+RedModFTFT_desc <- as.data.frame(cor(m.FTFT_pred$m.FTFT_predvals, m.FTFT_pred$FTFT_sum))
+
+options(scipen = 999)
+RedModFTFT_desc %>% 
+  rename(PredVsActual_Correlation = `cor(m.FTFT_pred$m.FTFT_predvals, m.FTFT_pred$FTFT_sum)`) %>% 
+  mutate(min_error =  min(m.FTFT_pred$m.FTFT_error),
+         median_error =  median(m.FTFT_pred$m.FTFT_error), 
+         mean_error = mean(m.FTFT_pred$m.FTFT_error),
+         max_error = max(m.FTFT_pred$m.FTFT_error),
+         percent_error = sum(abs(m.FTFT_pred$m.FTFT_error))/sum(m.FTFT_pred$FTFT_sum)) %>% 
+  gather(1:6, key = "Fit Index", value = "Value")
+```
+To better understand the differences in the Reduced Model's performance between total student counts and first time student counts, we investigated the errors as a ratio of actual data and for each student type.
+
+```{r FTFT total students comparison, message=FALSE,warning=FALSE}
+m_compare_FT_TS <- m_2_pred %>% #boxplot
+  left_join(m.FTFT_pred %>% select(Year,State,Inst_Type,m.FTFT_erroratio)) %>%
+  select(Year, Inst_Type,State, m_2_predvals, m.FTFT_erroratio,TS_st) %>% 
+  mutate(mTS_error_ratio = (m_2_predvals - TS_st)/TS_st) %>%
+  gather(mTS_error_ratio, m.FTFT_erroratio, key = "model", value = "error_ratio") %>%
+  ggplot(aes(x = error_ratio, color = model, group = model, fill = model, alpha = 0.5, linetype = model)) + 
+  geom_density() + geom_vline(xintercept = 0) +xlab("Error as a Ratio of Observed Data") +
+  ggtitle("Density plot of error ratio for best model on total students and FTFT") +
+  scale_fill_manual(values = c("green", "purple")) +
+  scale_colour_manual(values = c("white", "purple")) +
+  facet_wrap(~Inst_Type) + theme_minimal()  +
+  theme(legend.position = "none")
+ 
+m_compare_FT_TS
+```
+The area in green represents the distribution of error ratios for the first time student model, where the purple indicates the distribution of error ratios for the total student model. The largest differences between the two models is for 2-Yr institutions, where the total student model performs much better (albeit it's performance for 2-Yr instiutioins is also its worst).  For the other 3 institution types, the models are similar, but it can be seen that the total student model outperforms the first time student model in all cases.  
+
+##Conclusions
+This report highlights the advantages of proper regression methods and the importance of parsimony.  The final models used to estimate both total student counts and first time student counts are extremely simple relative to the complexity of other models of future college enrollment(i.e., HEDI model by Nathan Grawe). These models also suggest that just knowing the birth count of a state is highly predictive of college enrollment 18 years later.  Additionally, each model also shows that the relationship between birth counts 18 years prior and college enrollment depends on the insitution type. 
+
+Of course, there is still room for improvement in both models, particularly for 2-Year institutions whose enrollment counts are likely driven by other important variables not accounted for in the models reported here.  Furthermore, as shown earlier, each model still overestimates or underestimates by quite a few thousand students.  It is likely that including other variables (e.g., measures of economic activity) may help tighten the above models' predictions.  
+
+####References
+Raudenbush, Stephen W., and Anthony S. Bryk. Hierarchical linear models: Applications and data analysis methods. Vol. 1(2nd Ed.). Sage, 2002.
