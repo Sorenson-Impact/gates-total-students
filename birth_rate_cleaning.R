@@ -19,7 +19,6 @@ natl1993 <- read_csv("/Volumes/GoogleDrive/My Drive/SI/DataScience/data/gates/Bi
 natl1992 <- read_csv("/Volumes/GoogleDrive/My Drive/SI/DataScience/data/gates/BirthData/natl1992.csv")
 natl1998 <- read_csv("/Volumes/GoogleDrive/My Drive/SI/DataScience/data/gates/BirthData/natl1998.csv")
 natl1999 <- read_csv("/Volumes/GoogleDrive/My Drive/SI/DataScience/data/gates/BirthData/natl1999.csv")
-natl1999 <- read_csv("/Volumes/GoogleDrive/My Drive/SI/DataScience/data/gates/BirthData/natl1999.csv")
 natl2000 <- read_csv("/Volumes/GoogleDrive/My Drive/SI/DataScience/data/gates/BirthData/future birth rate data/natl2000.csv")
 natl2001 <- read_csv("/Volumes/GoogleDrive/My Drive/SI/DataScience/data/gates/BirthData/future birth rate data/natl2001.csv")
 natl2002 <- read_csv("/Volumes/GoogleDrive/My Drive/SI/DataScience/data/gates/BirthData/future birth rate data/natl2002.csv")

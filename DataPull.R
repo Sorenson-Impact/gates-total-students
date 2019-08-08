@@ -138,7 +138,10 @@ births95 <- read_rds("G:/My Drive/SI/DataScience/data/gates/BirthData/births95.r
 births96 <- read_rds("G:/My Drive/SI/DataScience/data/gates/BirthData/births96.rds") 
 births97 <- read_rds("G:/My Drive/SI/DataScience/data/gates/BirthData/births97.rds") 
 births98 <- read_rds("G:/My Drive/SI/DataScience/data/gates/BirthData/births98.rds") 
-births99 <- read_rds("G:/My Drive/SI/DataScience/data/gates/BirthData/births99.rds") 
+births99 <- read_rds("G:/My Drive/SI/DataScience/data/gates/BirthData/births99.rds")
+
+births98 <- read_rds("/Volumes/GoogleDrive/My Drive/SI/DataScience/data/gates/BirthData/births98.rds") 
+births99 <- read_rds("/Volumes/GoogleDrive/My Drive/SI/DataScience/data/gates/BirthData/births99.rds")
 
 birthdata <- births88 %>% 
   bind_rows(births89) %>% 
@@ -149,12 +152,53 @@ birthdata <- births88 %>%
   bind_rows(births94) %>% 
   bind_rows(births95) %>% 
   bind_rows(births96) %>% 
-  bind_rows(births97)  
+  bind_rows(births97) %>% 
+  bind_rows(births98) %>% 
+  bind_rows(births99)
 
 write_rds(birthdata, "G:/My Drive/SI/DataScience/data/gates/BirthData/birthdata.rds")
 
-  
+birthdata <- read_rds("/Volumes/GoogleDrive/My Drive/SI/DataScience/data/gates/BirthData/birthdata.rds")
 
-  
+births98 <- births98 %>% 
+  mutate(datayear = 1998)
 
+births99 <- births99 %>% 
+  mutate(datayear = 1999)
 
+# these arent updated yet
+birthdata <- birthdata %>% 
+  bind_rows(births98) %>% 
+  bind_rows(births99)
+
+birthdata <- birthdata %>% 
+  select(datayear, state, count = n)
+
+birthdata_years <- birthdata %>% 
+  mutate(t20 = datayear,
+         t19 = datayear+1, 
+         t18 = datayear+2) %>% 
+  mutate(realyear = datayear+20) %>% 
+  select(realyear, everything()) %>% 
+  select(realyear, state, t20, t19, t18)
+
+yay <- birthdata_years %>% 
+  left_join(birthdata, by = c("t20" = "datayear", "state" = "state")) %>% 
+  rename(count_t20 = count) %>% 
+  left_join(birthdata, by = c("t19" = "datayear", "state" = "state")) %>% 
+  rename(count_t19 = count) %>% 
+  left_join(birthdata, by = c("t18" = "datayear", "state" = "state")) %>% 
+  rename(count_t18 = count) %>% 
+  filter(realyear <= 2017)
+
+# this should be the final, correct birth data file
+write_rds(yay, "/Volumes/GoogleDrive/My Drive/SI/DataScience/data/gates/BirthData/birthdata_for_model.rds")
+
+birthdata_spread <- birthdata %>% 
+  spread(key = datayear, value = count)
+
+yay %>% 
+  filter(state == "AK") %>% 
+  ggplot(aes(x = t20, y = count_t20)) +
+  geom_col()
+    
