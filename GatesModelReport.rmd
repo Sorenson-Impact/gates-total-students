@@ -37,9 +37,11 @@ Overview of Data:
 efastate <- read_rds("G:/My Drive/SI/DataScience/data/gates/total_student_model/efastate.rds")
 
 
-birthdata <- read_rds("G:/My Drive/SI/DataScience/data/gates/BirthData/birthdata_for_model.rds")
+birthdata <- read_rds("G:/My Drive/SI/DataScience/data/gates/BirthData/birthdata_for_model_ALLYEARS.rds")
 birthdata <- birthdata %>% 
-  rename(Year = realyear, State = state)
+  rename(Year = realyear, State = state) %>% 
+  select(Year, State, count_t18) %>% 
+  mutate(count_t18_gc = scale(count_t18 - mean(count_t18)))
 
 institutions <- read_csv("G:/My Drive/SI/DataScience/data/gates/IPEDS/Full Gates Download/IPEDS Data/Institutions.csv")
 institutions <- institutions %>% 
@@ -63,13 +65,12 @@ df.total. <- df.total %>%
 
 df.total_st <- df.total. %>% 
   filter(count == 10) %>% 
-  select(State, totalstudents, FTFT, Year, Level, count_t18) %>% 
+  select(State, totalstudents, FTFT, Year, Level, count_t18_gc) %>% 
   group_by(State, Year,Level) %>% 
-  mutate(TS_st = sum(totalstudents), FTFT_sum = sum(FTFT)) %>% ungroup() %>% 
+  mutate(TS_st = sum(totalstudents, na.rm = TRUE), FTFT_sum = sum(FTFT, na.rm = TRUE)) %>% ungroup() %>% 
   select(-c(totalstudents, FTFT)) %>% 
   unique() %>% 
-  mutate(count_t18_gc = scale(count_t18 - mean(count_t18, na.rm = TRUE)),
-         Inst_Type = factor(Level))
+  mutate(Inst_Type = factor(Level))
 
 head(df.total_st)
 
@@ -116,7 +117,7 @@ Given the non-normality of both of our outcome variables, it is appropriate to s
 First, we report our full total students model that attempts to predict the total number of college going students in a given state and for a given institution type between the years 2008-2013.  We chose to 'train' the model on the years of 2008-2013 simply because we wanted a balance between having enough data for the model and enough remaining data to compare the model's predictions with actual enrollment counts.  
 ```{r Filtering code, message=FALSE,warning=FALSE}
 df.model_st <- df.total_st %>% 
-  filter(Year < 2014 & is.na(count_t18) == FALSE)
+  filter(Year < 2014 & is.na(State) == FALSE)
 
 df.future_st <- df.total_st %>% 
   filter(Year >= 2014 & is.na(State) == FALSE)
@@ -289,15 +290,100 @@ RedMod_desc %>%
          max_error = max(m_2_pred$m_2_error),
          percent_error = sum(abs(m_2_pred$m_2_error))/sum(m_2_pred$TS_st)) %>% 
   gather(1:6, key = "Fit Index", value = "Value")
-
-
 ```
 
 Based on the above graphs and fit indices, it is clear that the reduced model is performing extremely well.  The correlation between the predicted and actual values, across year and institution type, is 0.996.  At its worst, the Reduced Model underestimates college enrollment by about 116,069 students and overestimates college enrollment by about 72,806.  However, on average the model is off by only about 480 students, which is somewhat exaggerated due to a positive skew indicated by the fact that the median error rate is about a 42 student underestimation.  
 
 Currently, we consider this 'Reduced Model' as our best predictor of future college enrollment.  Since data exists on birth rates 18 years before college enrollment counts far into the future, we can use this model to predict the total amount of students for a given state and insitution type from 2018 - 2035.  The plot below shows the current model's predictions for the total college enrollment counts for the years 2018 - 2035.
 ```{r Future Predictions total students}
-plot(x = 2, y = 3)
+df.future_st_post17 <- df.future_st %>% 
+  select(State, Inst_Type) %>% 
+  unique() %>% 
+  left_join(birthdata %>% filter(Year > 2017))
+
+  
+TSpred_post17 <- df.future_st_post17 %>% 
+  mutate(TSpost17predvals = exp(predict(m_2, newdata = df.future_st_post17, allow.new.levels = TRUE, 
+                                       re.form = ~(1 + Inst_Type| State)))) 
+
+birthdata_post17 <- birthdata %>% 
+  select(Year, count_t18) %>% 
+  group_by(Year) %>% 
+  mutate(TotalBirths = mean(count_t18_gc)) %>% 
+  select(-c(count_t18_gc)) %>% 
+  unique() %>%  
+  ggplot(aes(x = Year-18, y = TotalBirths)) + geom_point() + geom_line() +
+  ggtitle("Births 18 Years Prior by Year") + theme_minimal() + ylab("Total Births") + xlab("") 
+
+ 
+
+TSpred <- TSpred_post17 %>% 
+  group_by(Year, Inst_Type) %>% 
+  mutate(TotalEnrollment_pred = sum(TSpost17predvals)) %>% 
+  select(Year, Inst_Type, TotalEnrollment_pred) %>% 
+  unique() %>% 
+  filter(Inst_Type == "4-Yr") %>% 
+  ggplot(aes(x = Year, y = TotalEnrollment_pred)) + geom_point() + geom_line() +
+  ggtitle("Predicted Total Enrollment: 2017 - 2035") + theme_minimal() + ylab("Predicted Total Enrollment") + xlab("")
+
+ggarrange(birthdata_post17,TSpred, ncol = 1, nrow = 2)
+
+
+
+
+#All years
+df.future_st_allYears <- df.future_st %>% 
+  select(State, Inst_Type) %>% 
+  unique() %>% 
+  left_join(birthdata)
+
+birthplot <- birthdata %>% 
+  select(Year, count_t18) %>% 
+  group_by(Year) %>% 
+  mutate(TotalBirths = sum(count_t18)) %>% 
+  select(-c(count_t18)) %>% 
+  unique() %>%  
+  mutate(modelyears = ifelse(Year-18 < 2000, "Known Enrollment", "Unknown Enrollment")) %>% 
+  ggplot(aes(x = Year-18, y = TotalBirths, color = modelyears)) + geom_point() + geom_line() +
+  ggtitle("Births 18 Years Prior by Year") + theme_minimal() + ylab("Total Births") + xlab("") + 
+  scale_x_continuous(breaks = seq(1990,2017,1), limits =c(1990,2017))
+
+AllYearsPred <- df.future_st_allYears %>% 
+  mutate(AllYearsPredVals = exp(predict(m_2, newdata = df.future_st_allYears, allow.new.levels = TRUE, 
+                                       re.form = ~(1 + Inst_Type| State))))
+AllYearsPredPlot <- AllYearsPred %>% 
+  group_by(Year, Inst_Type) %>% 
+  mutate(TotalEnrollment_pred = sum(AllYearsPredVals)) %>% 
+  select(Year, Inst_Type, TotalEnrollment_pred) %>% 
+  unique() %>% 
+  mutate(modelyears = ifelse(Year < 2018, "Known Enrollment", "Unknown Enrollment")) %>% 
+  filter(Inst_Type == "4-Yr") %>% 
+  ggplot(aes(x = Year, y = TotalEnrollment_pred, color = modelyears)) + geom_point() + geom_line() +
+  ggtitle("Predicted Total Enrollment: 2017 - 2035") + theme_minimal() + ylab("Predicted Total Enrollment") + xlab("") +
+  scale_x_continuous(breaks = seq(2008,2035,1), limits =c(2008,2035))
+ggarrange(birthplot,AllYearsPredPlot, ncol = 1, nrow = 2)
+
+ #All Years FTFT
+AllYearsFTFTPred <- df.future_st_allYears %>% 
+  mutate(AllYearsFTFTPredvals = exp(predict(m.FTFT, newdata = df.future_st_allYears, allow.new.levels = TRUE, 
+                                    re.form = ~(1 + Inst_Type | State))))
+AllYearsFTFTPredPlot <- AllYearsFTFTPred %>% 
+  group_by(Year, Inst_Type) %>% 
+  mutate(TotalFTFTEnrollment_pred = sum(AllYearsFTFTPredvals)) %>% 
+  select(Year, Inst_Type, TotalEnrollment_pred) %>% 
+  unique() %>% 
+  mutate(modelyears = ifelse(Year < 2018, "Known Enrollment", "Unknown Enrollment")) %>% 
+  filter(Inst_Type == "4-Yr") %>% 
+  ggplot(aes(x = Year, y = TotalEnrollment_pred, color = modelyears)) + geom_point() + geom_line() +
+  ggtitle("Predicted Total Enrollment: 2017 - 2035") + theme_minimal() + ylab("Predicted Total Enrollment") + xlab("") +
+  scale_x_continuous(breaks = seq(2008,2035,1), limits =c(2008,2035))
+
+ 
+
+
+AllYears
+
+
 ```
 
 ## First Time Full Time Students
