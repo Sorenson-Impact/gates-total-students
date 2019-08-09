@@ -7,10 +7,7 @@ library(tidyverse)
 library(purrr)
 library(tidycensus)
 
-<<<<<<< HEAD
-=======
 # i am so sorry, i couldnt figure out how to automate ... :( -- Lily
->>>>>>> f088333559d906ab0f8277bc6b9cf094baeab871
 natl1988 <- read_csv("/Volumes/GoogleDrive/My Drive/SI/DataScience/data/gates/BirthData/natl1988.csv")
 natl1989 <- read_csv("/Volumes/GoogleDrive/My Drive/SI/DataScience/data/gates/BirthData/natl1989.csv")
 natl1990 <- read_csv("/Volumes/GoogleDrive/My Drive/SI/DataScience/data/gates/BirthData/natl1990.csv")
@@ -136,7 +133,6 @@ births99 <- natl1999 %>%
   select(-c(stoccfip)) %>% 
   left_join(fips)
 
-<<<<<<< HEAD
 write_rds(births88, "/Volumes/GoogleDrive/My Drive/SI/DataScience/data/gates/BirthData/births88.rds")
 write_rds(births89, "/Volumes/GoogleDrive/My Drive/SI/DataScience/data/gates/BirthData/births89.rds")
 write_rds(births90, "/Volumes/GoogleDrive/My Drive/SI/DataScience/data/gates/BirthData/births90.rds")
@@ -149,7 +145,6 @@ write_rds(births92, "/Volumes/GoogleDrive/My Drive/SI/DataScience/data/gates/Bir
 write_rds(births98, "/Volumes/GoogleDrive/My Drive/SI/DataScience/data/gates/BirthData/births98.rds")
 write_rds(births99, "/Volumes/GoogleDrive/My Drive/SI/DataScience/data/gates/BirthData/births99.rds")
 
-=======
 births00 <- natl2000 %>% 
   group_by(stoccfip) %>% 
   count() %>% 
@@ -1036,5 +1031,4 @@ write_rds(births14, "/Volumes/GoogleDrive/My Drive/SI/DataScience/data/gates/Bir
 write_rds(births15, "/Volumes/GoogleDrive/My Drive/SI/DataScience/data/gates/BirthData/cleaned data/births15.rds")
 write_rds(births16, "/Volumes/GoogleDrive/My Drive/SI/DataScience/data/gates/BirthData/cleaned data/births16.rds")
 write_rds(births17, "/Volumes/GoogleDrive/My Drive/SI/DataScience/data/gates/BirthData/cleaned data/births17.rds")
->>>>>>> f088333559d906ab0f8277bc6b9cf094baeab871
 

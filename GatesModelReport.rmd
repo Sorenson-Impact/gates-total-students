@@ -1,5 +1,5 @@
 ---
-title: 'Gates: College Going Model Report'
+title: 'Gates: College Attendance Model Report'
 author: "Grant Pointon & Lily Bailey"
 date: "August 8, 2019"
 output: 
@@ -14,6 +14,22 @@ library(siverse)
 ```
 
 ##Data
+
+The two main sources of data for this model are from the Integrated Postsecondary Education Data System (IPEDS) and the National Bureau of Economic Research via the National Center for Health Statistics (NCHS). IPEDS is a system of interrelated surveys conducted annually by the U.S. Department of Education’s National Center for Education Statistics (NCES). IPEDS gathers information from every college, university, and technical and vocational institution that participates in the federal student financial aid programs (nces.ed.gov/ipeds). In this dataset there is information for the years 2008-2017 for each school surveyed including school type, total enrolled students, first time full time students, and school location.
+
+(need input from Gwen and Dan about school selection criteria)
+We are using a subset of the total IPEDS data, only retaining degree granting institutions. We are also only including institutions for which we have a full year set of data from 2008-2017, which removes [GRANT INSERT NUMBER HERE] institutions from the dataset. Additionally, we were missing state data for [GRANT INSERT NUMBER HERE] institutions which we also ommitted for the model.
+
+The birth rate data comes from the NCES in a variety of forms. For 1988-2004, the data comes as a table with every row being a different, unique individual born in the USA during that year. We grouped by state of occurence (VARIABLE NAME) and counted the number of individuals born. [..... need to finish ......]
+
+non complete year span
+didnt have state data for some institutions
+
+Overview of Data:
+- institutions per state
+- institutions per type
+- institutions by size
+- 
 
 
 ```{r data, message=FALSE,warning=FALSE}
@@ -58,6 +74,8 @@ df.total_st <- df.total. %>%
 head(df.total_st)
 
 ```
+(PERHAPS A DATA DICTIONARY/TABLE INSTEAD??)
+
 Above is the final version of the data we used for each of the models reported below.  Our two main outcome variables are "TS_st" and "FTFT_sum", which represent the total students and total first time (full time) students enrolled in a given state for each institution type (2-Year, 4-Year, National 4-YR, and Elite 4-Year) during the years 2008 - 2017, respectively.  Our two main predictor variables are "count_t18_gc" and "Inst_Type".  count_t18 represents the birthrate count for a given state 18 years prior to the year that the total and first time student counts were recorded.  To reduce any potential multicolineraity and to provide the model with a more appropriate scale, we grand centered (count - mean(count_t18)) count_t18 and then z-scored the grand centered values.
 
 ###Outcome variable analysis 
