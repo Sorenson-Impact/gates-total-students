@@ -13,21 +13,21 @@ library(tidyverse)
 library(siverse)
 library(ggpubr)
 
-efastate <- read_rds("G:/My Drive/SI/DataScience/data/gates/total_student_model/efastate.rds")
+efastate <- read_rds("/Volumes/GoogleDrive//My Drive/SI/DataScience/data/gates/total_student_model/efastate.rds")
 
 
-birthdata <- read_rds("G:/My Drive/SI/DataScience/data/gates/BirthData/birthdata_for_model_ALLYEARS.rds")
+birthdata <- read_rds("/Volumes/GoogleDrive//My Drive/SI/DataScience/data/gates/BirthData/birthdata_for_model_ALLYEARS.rds")
 birthdata <- birthdata %>% 
   rename(Year = realyear, State = state) %>% 
   select(Year, State, count_t18) %>% 
   mutate(count_t18_gc = scale(count_t18 - mean(count_t18)))
 
-institutions <- read_csv("G:/My Drive/SI/DataScience/data/gates/IPEDS/Full Gates Download/IPEDS Data/Institutions.csv")
+institutions <- read_csv("/Volumes/GoogleDrive//My Drive/SI/DataScience/data/gates/IPEDS/Full Gates Download/IPEDS Data/Institutions.csv")
 institutions <- institutions %>% 
   select(UNITID = `Institution ID`, State,`Degree Granting`) %>% 
   unique()
 
-sensitivity <- read_rds("G:/My Drive/SI/DataScience/data/gates/sensitivity/sensitivity.rds")
+sensitivity <- read_rds("/Volumes/GoogleDrive//My Drive/SI/DataScience/data/gates/sensitivity/sensitivity.rds")
 sensitivity <- sensitivity %>% select(UNITID = unitid, Level, acceptance_rate, tuition_rev) %>%
   unique()
 ```
